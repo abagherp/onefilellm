@@ -20,6 +20,8 @@ from time import sleep
 import xml.etree.ElementTree as ET
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
+from onefilellm.utils import process_github_pull_request, process_github_issue, process_github_repo, fetch_youtube_transcript, process_arxiv_pdf, crawl_and_extract_text, process_doi_or_pmid, escape_xml, truncate_text_to_tokens, should_exclude_path, is_allowed_filetype
+
 # Download NLTK data and initialize stop words
 nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words("english"))
@@ -51,54 +53,53 @@ def safe_file_read(filepath, fallback_encoding='latin1'):
         with open(filepath, "r", encoding=fallback_encoding) as file:
             return file.read()
 
-# Copy all the helper functions from onefilellm.py
-def download_file(url, target_path):
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    with open(target_path, "wb") as f:
-        f.write(response.content)
-
-def is_allowed_filetype(filename):
-    allowed_extensions = ['.py', '.txt', '.js', '.tsx', '.ts', '.md', '.cjs', '.html', '.json', '.ipynb', '.h', '.localhost', '.sh', '.yaml', '.example']
-    exluded_files = ['compressed_output.txt', 'uncompressed_output.txt', 'processed_urls.txt', 'instruction.md', 'instructions.md']
-    return any(filename.endswith(ext) for ext in allowed_extensions) and not any(filename.endswith(file) for file in exluded_files)
-
-def process_ipynb_file(temp_file):
-    with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
-        notebook_content = f.read()
-
-    exporter = PythonExporter()
-    python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
-    return python_code
-
-def escape_xml(text):
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
-
-def process_local_folder(local_path):
+def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
     content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
+    excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
+    
     for root, dirs, files in os.walk(local_path):
-        # Exclude unwanted directories
-        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
+        # Filter out excluded directories
+        dirs[:] = [d for d in dirs if not should_exclude_path(
+            os.path.join(root, d), 
+            local_path, 
+            excluded_dirs
+        )]
         
+        # Skip this directory if it should be excluded
+        if should_exclude_path(root, local_path, excluded_dirs):
+            continue
+            
         for file in files:
             if is_allowed_filetype(file):
-                print(f"Processing {os.path.join(root, file)}...")
-
                 file_path = os.path.join(root, file)
+                if should_exclude_path(file_path, local_path, excluded_dirs):
+                    continue
+                    
+                print(f"Processing {file_path}...")
+
                 relative_path = os.path.relpath(file_path, local_path)
                 content.append(f'<file name="{escape_xml(relative_path)}">')
 
                 if file.endswith(".ipynb"):
-                    content.append(escape_xml(process_ipynb_file(file_path)))
+                    file_content = process_ipynb_file(file_path)
                 else:
                     with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
-                        content.append(escape_xml(f.read()))
-
+                        file_content = f.read()
+                
+                # Truncate content if needed
+                file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
+                
+                # Get token count for this file
+                file_token_count = get_token_count(file_content)
+                if was_truncated:
+                    print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
+                else:
+                    print(f"Token count: {file_token_count}")
+                
+                if was_truncated:
+                    content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
+                
+                content.append(escape_xml(file_content))
                 content.append('</file>')
 
     content.append('</source>')
@@ -156,7 +157,7 @@ def preprocess_text(input_file, output_file):
             out_file.write(processed_text)
         print("XML parsing failed. Text preprocessing completed without XML structure.")
 
-def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
+def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None):
     """
     Process the input and generate output files in the working directory
     
@@ -165,14 +166,17 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
         working_dir: Directory where output files should be created
         console: Rich console instance for output
         custom_excluded_dirs: Set of additional directories to exclude
+        max_tokens: Maximum number of tokens per file
     """
-    # Combine default and custom excluded directories
-    excluded_dirs = DEFAULT_EXCLUDED_DIRS.union(custom_excluded_dirs or set())
+    # Define output files with full paths - use input_path directory instead of working_dir
+    if os.path.isdir(input_path):
+        output_dir = input_path
+    else:
+        output_dir = os.path.dirname(input_path)
     
-    # Define output files with full paths
-    output_file = os.path.join(working_dir, "uncompressed_output.txt")
-    processed_file = os.path.join(working_dir, "compressed_output.txt")
-    urls_list_file = os.path.join(working_dir, "processed_urls.txt")
+    output_file = os.path.join(output_dir, "uncompressed_output.txt")
+    processed_file = os.path.join(output_dir, "compressed_output.txt")
+    urls_list_file = os.path.join(output_dir, "processed_urls.txt")
 
     console.print(f"\n[bold bright_green]You entered:[/bold bright_green] [bold bright_yellow]{input_path}[/bold bright_yellow]\n")
 
@@ -187,11 +191,11 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
         try:
             if "github.com" in input_path:
                 if "/pull/" in input_path:
-                    final_output = process_github_pull_request(input_path)
+                    final_output = process_github_pull_request(input_path, custom_excluded_dirs)
                 elif "/issues/" in input_path:
-                    final_output = process_github_issue(input_path)
+                    final_output = process_github_issue(input_path, custom_excluded_dirs)
                 else:
-                    final_output = process_github_repo(input_path)
+                    final_output = process_github_repo(input_path, custom_excluded_dirs)
             elif urlparse(input_path).scheme in ["http", "https"]:
                 if "youtube.com" in input_path or "youtu.be" in input_path:
                     final_output = fetch_youtube_transcript(input_path)
@@ -205,7 +209,7 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
             elif input_path.startswith("10.") and "/" in input_path or input_path.isdigit():
                 final_output = process_doi_or_pmid(input_path)
             else:
-                final_output = process_local_folder(input_path)
+                final_output = process_local_folder(input_path, max_tokens, custom_excluded_dirs)
 
             progress.update(task, advance=50)
 
@@ -226,7 +230,7 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
             uncompressed_token_count = get_token_count(uncompressed_text)
             console.print(f"[bright_green]Uncompressed Token Count:[/bright_green] [bold bright_cyan]{uncompressed_token_count}[/bold bright_cyan]")
 
-            console.print(f"\n[bold bright_yellow]{processed_file}[/bold bright_yellow] and [bold bright_blue]{output_file}[/bold bright_blue] have been created in the working directory.")
+            console.print(f"\n[bold bright_yellow]{processed_file}[/bold bright_yellow] and [bold bright_blue]{output_file}[/bold bright_blue] have been created in {output_dir}")
 
             pyperclip.copy(uncompressed_text)
             console.print(f"\n[bright_white]The contents of [bold bright_blue]{output_file}[/bold bright_blue] have been copied to the clipboard.[/bright_white]")
