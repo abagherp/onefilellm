@@ -1,2 +1,2 @@
 #!/bin/bash
-pip install -e . 
+pip install -e . --use-pep517 --no-cache-dir

@@ -20,8 +20,12 @@ from time import sleep
 import xml.etree.ElementTree as ET
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
-# Import existing constants and helper functions from onefilellm.py
-EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
+# Download NLTK data and initialize stop words
+nltk.download('stopwords', quiet=True)
+stop_words = set(stopwords.words("english"))
+
+# Constants
+DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
 
 TOKEN = os.getenv('GITHUB_TOKEN', 'default_token_here')
 if TOKEN == 'default_token_here':
@@ -29,19 +33,128 @@ if TOKEN == 'default_token_here':
 
 headers = {"Authorization": f"token {TOKEN}"}
 
+def safe_file_read(filepath, fallback_encoding='latin1'):
+    """
+    Safely read a file with UTF-8 encoding, falling back to latin1 if needed.
+    
+    Args:
+        filepath: Path to the file to read
+        fallback_encoding: Encoding to try if UTF-8 fails
+    
+    Returns:
+        str: Contents of the file
+    """
+    try:
+        with open(filepath, "r", encoding='utf-8') as file:
+            return file.read()
+    except UnicodeDecodeError:
+        with open(filepath, "r", encoding=fallback_encoding) as file:
+            return file.read()
+
 # Copy all the helper functions from onefilellm.py
 def download_file(url, target_path):
-    # ... (copy the function implementation)
-    pass
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    with open(target_path, "wb") as f:
+        f.write(response.content)
 
 def is_allowed_filetype(filename):
-    # ... (copy the function implementation)
-    pass
+    allowed_extensions = ['.py', '.txt', '.js', '.tsx', '.ts', '.md', '.cjs', '.html', '.json', '.ipynb', '.h', '.localhost', '.sh', '.yaml', '.example']
+    exluded_files = ['compressed_output.txt', 'uncompressed_output.txt', 'processed_urls.txt', 'instruction.md', 'instructions.md']
+    return any(filename.endswith(ext) for ext in allowed_extensions) and not any(filename.endswith(file) for file in exluded_files)
 
-# Copy all other helper functions...
+def process_ipynb_file(temp_file):
+    with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
+        notebook_content = f.read()
 
-# Update the default excluded dirs
-DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
+    exporter = PythonExporter()
+    python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
+    return python_code
+
+def escape_xml(text):
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+def process_local_folder(local_path):
+    content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
+    for root, dirs, files in os.walk(local_path):
+        # Exclude unwanted directories
+        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
+        
+        for file in files:
+            if is_allowed_filetype(file):
+                print(f"Processing {os.path.join(root, file)}...")
+
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, local_path)
+                content.append(f'<file name="{escape_xml(relative_path)}">')
+
+                if file.endswith(".ipynb"):
+                    content.append(escape_xml(process_ipynb_file(file_path)))
+                else:
+                    with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
+                        content.append(escape_xml(f.read()))
+
+                content.append('</file>')
+
+    content.append('</source>')
+    print("All files processed.")
+    return '\n'.join(content)
+
+def get_token_count(text, disallowed_special=[], chunk_size=1000):
+    enc = tiktoken.get_encoding("cl100k_base")
+
+    # Remove XML tags
+    text_without_tags = re.sub(r'<[^>]+>', '', text)
+
+    # Split the text into smaller chunks
+    chunks = [text_without_tags[i:i+chunk_size] for i in range(0, len(text_without_tags), chunk_size)]
+    total_tokens = 0
+
+    for chunk in chunks:
+        tokens = enc.encode(chunk, disallowed_special=disallowed_special)
+        total_tokens += len(tokens)
+    
+    return total_tokens
+
+def preprocess_text(input_file, output_file):
+    with open(input_file, "r", encoding="utf-8") as input_file:
+        input_text = input_file.read()
+
+    def process_text(text):
+        text = re.sub(r"[\n\r]+", "\n", text)
+        text = re.sub(r"[^a-zA-Z0-9\s_.,!?:;@#$%^&*()+\-=[\]{}|\\<>`~'\"/]+", "", text)
+        text = re.sub(r"\s+", " ", text)
+        text = text.lower()
+        words = text.split()
+        words = [word for word in words if word not in stop_words]
+        return " ".join(words)
+
+    try:
+        # Try to parse the input as XML
+        root = ET.fromstring(input_text)
+
+        # Process text content while preserving XML structure
+        for elem in root.iter():
+            if elem.text:
+                elem.text = process_text(elem.text)
+            if elem.tail:
+                elem.tail = process_text(elem.tail)
+
+        # Write the processed XML to the output file
+        tree = ET.ElementTree(root)
+        tree.write(output_file, encoding="utf-8", xml_declaration=True)
+        print("Text preprocessing completed with XML structure preserved.")
+    except ET.ParseError:
+        # If XML parsing fails, process the text without preserving XML structure
+        processed_text = process_text(input_text)
+        with open(output_file, "w", encoding="utf-8") as out_file:
+            out_file.write(processed_text)
+        print("XML parsing failed. Text preprocessing completed without XML structure.")
 
 def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
     """
