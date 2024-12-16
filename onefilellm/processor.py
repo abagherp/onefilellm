@@ -40,10 +40,22 @@ def is_allowed_filetype(filename):
 
 # Copy all other helper functions...
 
-def process_input(input_path, working_dir, console):
+# Update the default excluded dirs
+DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
+
+def process_input(input_path, working_dir, console, custom_excluded_dirs=None):
     """
     Process the input and generate output files in the working directory
+    
+    Args:
+        input_path: Path or URL to process
+        working_dir: Directory where output files should be created
+        console: Rich console instance for output
+        custom_excluded_dirs: Set of additional directories to exclude
     """
+    # Combine default and custom excluded directories
+    excluded_dirs = DEFAULT_EXCLUDED_DIRS.union(custom_excluded_dirs or set())
+    
     # Define output files with full paths
     output_file = os.path.join(working_dir, "uncompressed_output.txt")
     processed_file = os.path.join(working_dir, "compressed_output.txt")
