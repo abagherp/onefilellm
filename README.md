@@ -103,20 +103,69 @@
 
 ## Installation
 
-### Prerequisites
+## Command Line Interface
 
-Install the required dependencies:
+After installation, 1FileLLM can be run as a command-line tool from anywhere in your system. Instead of running:
 
 ```bash
-pip install -U -r requirements.txt
+python onefilellm.py /path/to/repo
 ```
 
-Optionally, create a virtual environment for isolation:
+You can now use:
 
 ```bash
+onefilellm /path/to/repo
+```
+
+### Working Directory
+
+The tool will generate output files in your current working directory:
+- If you run `onefilellm /path/to/repo`, the output files will be created in your current directory
+- If you first `cd /path/to/repo` and then run `onefilellm .`, the output files will be created in that directory
+
+### Installation Options
+
+#### Method 1: Install from source (recommended for development)
+```bash
+# Clone the repository
+git clone https://github.com/jimmc414/1filellm.git
+cd 1filellm
+
+# Create and activate a virtual environment (optional but recommended)
 python -m venv .venv
-source .venv/bin/activate
-pip install -U -r requirements.txt
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install the package in editable mode
+pip install -e . --use-pep517
+```
+
+#### Method 2: Quick install script
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+### Project Structure
+The CLI implementation is organized as follows:
+```
+onefilellm/
+├── setup.py                 # Package installation configuration
+├── pyproject.toml          # Project metadata and dependencies
+├── install.sh             # Quick installation script
+├── onefilellm/
+│   ├── __init__.py        # Package initialization
+│   ├── cli.py             # Command-line interface
+│   └── processor.py       # Core processing logic
+```
+
+### Environment Variables
+Make sure to set your GitHub token before using GitHub-related features:
+```bash
+# For bash/zsh
+export GITHUB_TOKEN="your_token_here"
+
+# For Windows PowerShell
+$env:GITHUB_TOKEN="your_token_here"
 ```
 
 ### GitHub Personal Access Token

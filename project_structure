@@ -1,0 +1,6 @@
+onefilellm/
+├── setup.py
+├── onefilellm/
+│   ├── __init__.py
+│   ├── cli.py           # Main CLI code
+│   └── processor.py     # Core processing logic 
