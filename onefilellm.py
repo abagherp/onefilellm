@@ -28,6 +28,8 @@ from rich.traceback import install
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 import xml.etree.ElementTree as ET
 
+EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
+
 def safe_file_read(filepath, fallback_encoding='latin1'):
     try:
         with open(filepath, "r", encoding='utf-8') as file:
@@ -53,9 +55,9 @@ def download_file(url, target_path):
 
 def is_allowed_filetype(filename):
     allowed_extensions = ['.py', '.txt', '.js', '.tsx', '.ts', '.md', '.cjs', '.html', '.json', '.ipynb', '.h', '.localhost', '.sh', '.yaml', '.example']
+    exluded_files = ['compressed_output.txt', 'uncompressed_output.txt', 'processed_urls.txt', 'instruction.md', 'instructions.md']
 #    allowed_extensions = ['.md']
-    return any(filename.endswith(ext) for ext in allowed_extensions)
-    
+    return any(filename.endswith(ext) for ext in allowed_extensions) and not any(filename.endswith(file) for file in exluded_files)
 
 def process_ipynb_file(temp_file):
     with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
@@ -94,6 +96,8 @@ def process_directory(url, output):
 
 def process_local_directory(local_path, output):
     for root, dirs, files in os.walk(local_path):
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+        
         for file in files:
             if is_allowed_filetype(file):
                 print(f"Processing {os.path.join(root, file)}...")
@@ -150,6 +154,10 @@ def process_github_repo(repo_url):
                 repo_content.append('</file>')
                 os.remove(temp_file)
             elif file["type"] == "dir":
+                dir_name = file["name"]
+                if dir_name in EXCLUDED_DIRS:
+                    print(f"Skipping excluded directory: {file['path']}/")
+                    continue
                 process_directory(file["url"], repo_content)
 
     process_directory(contents_url, repo_content)
@@ -159,31 +167,29 @@ def process_github_repo(repo_url):
     return "\n".join(repo_content)
 
 def process_local_folder(local_path):
-    def process_local_directory(local_path):
-        content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
-        for root, dirs, files in os.walk(local_path):
-            for file in files:
-                if is_allowed_filetype(file):
-                    print(f"Processing {os.path.join(root, file)}...")
+    content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
+    for root, dirs, files in os.walk(local_path):
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+        
+        for file in files:
+            if is_allowed_filetype(file):
+                print(f"Processing {os.path.join(root, file)}...")
 
-                    file_path = os.path.join(root, file)
-                    relative_path = os.path.relpath(file_path, local_path)
-                    content.append(f'<file name="{escape_xml(relative_path)}">')
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, local_path)
+                content.append(f'<file name="{escape_xml(relative_path)}">')
 
-                    if file.endswith(".ipynb"):
-                        content.append(escape_xml(process_ipynb_file(file_path)))
-                    else:
-                        with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
-                            content.append(escape_xml(f.read()))
+                if file.endswith(".ipynb"):
+                    content.append(escape_xml(process_ipynb_file(file_path)))
+                else:
+                    with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
+                        content.append(escape_xml(f.read()))
 
-                    content.append('</file>')
+                content.append('</file>')
 
-        content.append('</source>')
-        return '\n'.join(content)
-
-    formatted_content = process_local_directory(local_path)
+    content.append('</source>')
     print("All files processed.")
-    return formatted_content
+    return '\n'.join(content)
 
 def process_arxiv_pdf(arxiv_abs_url):
     pdf_url = arxiv_abs_url.replace("/abs/", "/pdf/") + ".pdf"
