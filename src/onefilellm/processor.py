@@ -1,26 +1,18 @@
 import os
-import sys
-import requests
-from bs4 import BeautifulSoup, Comment
-from urllib.parse import urljoin, urlparse
-from PyPDF2 import PdfReader
+from urllib.parse import urlparse
 import tiktoken
 import nltk
 from nltk.corpus import stopwords
 import re
-from pathlib import Path
-import nbformat
-from nbconvert import PythonExporter
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.formatters import TextFormatter
 import pyperclip
-import wget
-from tqdm import tqdm
-from time import sleep
 import xml.etree.ElementTree as ET
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
-from onefilellm.utils import process_github_pull_request, process_github_issue, process_github_repo, fetch_youtube_transcript, process_arxiv_pdf, crawl_and_extract_text, process_doi_or_pmid, escape_xml, truncate_text_to_tokens, should_exclude_path, is_allowed_filetype
+from onefilellm.utils import (
+    process_github_pull_request, process_github_issue, process_github_repo, fetch_youtube_transcript, process_arxiv_pdf, 
+    crawl_and_extract_text, process_doi_or_pmid, escape_xml, truncate_text_to_tokens, should_exclude_path, is_allowed_filetype, 
+    process_ipynb_file, get_token_count, preprocess_text, safe_file_read
+)
 
 # Download NLTK data and initialize stop words
 nltk.download('stopwords', quiet=True)
@@ -52,59 +44,6 @@ def safe_file_read(filepath, fallback_encoding='latin1'):
     except UnicodeDecodeError:
         with open(filepath, "r", encoding=fallback_encoding) as file:
             return file.read()
-
-def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
-    content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
-    excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
-    
-    for root, dirs, files in os.walk(local_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not should_exclude_path(
-            os.path.join(root, d), 
-            local_path, 
-            excluded_dirs
-        )]
-        
-        # Skip this directory if it should be excluded
-        if should_exclude_path(root, local_path, excluded_dirs):
-            continue
-            
-        for file in files:
-            if is_allowed_filetype(file):
-                file_path = os.path.join(root, file)
-                if should_exclude_path(file_path, local_path, excluded_dirs):
-                    continue
-                    
-                print(f"Processing {file_path}...")
-
-                relative_path = os.path.relpath(file_path, local_path)
-                content.append(f'<file name="{escape_xml(relative_path)}">')
-
-                if file.endswith(".ipynb"):
-                    file_content = process_ipynb_file(file_path)
-                else:
-                    with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
-                        file_content = f.read()
-                
-                # Truncate content if needed
-                file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
-                
-                # Get token count for this file
-                file_token_count = get_token_count(file_content)
-                if was_truncated:
-                    print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
-                else:
-                    print(f"Token count: {file_token_count}")
-                
-                if was_truncated:
-                    content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
-                
-                content.append(escape_xml(file_content))
-                content.append('</file>')
-
-    content.append('</source>')
-    print("All files processed.")
-    return '\n'.join(content)
 
 def get_token_count(text, disallowed_special=[], chunk_size=1000):
     enc = tiktoken.get_encoding("cl100k_base")
@@ -157,9 +96,19 @@ def preprocess_text(input_file, output_file):
             out_file.write(processed_text)
         print("XML parsing failed. Text preprocessing completed without XML structure.")
 
-def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None):
+def get_source_name(input_path):
+    """Generate a name for the output files based on the input source"""
+    if "github.com" in input_path:
+        parts = input_path.split("github.com/")[-1].split("/")
+        if len(parts) >= 2:
+            return f"{parts[0]}_{parts[1]}"
+    elif os.path.isdir(input_path):
+        return os.path.basename(input_path)
+    return "output"
+
+def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None, output_dir=None):
     """
-    Process the input and generate output files in the working directory
+    Process the input and generate output files
     
     Args:
         input_path: Path or URL to process
@@ -167,16 +116,22 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
         console: Rich console instance for output
         custom_excluded_dirs: Set of additional directories to exclude
         max_tokens: Maximum number of tokens per file
+        output_dir: Optional directory to store output files
     """
-    # Define output files with full paths - use input_path directory instead of working_dir
-    if os.path.isdir(input_path):
-        output_dir = input_path
-    else:
-        output_dir = os.path.dirname(input_path)
+    # Generate source name for output files
+    source_name = get_source_name(input_path)
     
-    output_file = os.path.join(output_dir, "uncompressed_output.txt")
-    processed_file = os.path.join(output_dir, "compressed_output.txt")
-    urls_list_file = os.path.join(output_dir, "processed_urls.txt")
+    # Determine output directory
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        output_base = os.path.join(output_dir, source_name)
+    else:
+        output_base = os.path.join(os.getcwd(), source_name)
+    
+    # Define output files with full paths
+    output_file = f"{output_base}_uncompressed.txt"
+    processed_file = f"{output_base}_compressed.txt"
+    urls_list_file = f"{output_base}_urls.txt"
 
     console.print(f"\n[bold bright_green]You entered:[/bold bright_green] [bold bright_yellow]{input_path}[/bold bright_yellow]\n")
 

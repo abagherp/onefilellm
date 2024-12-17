@@ -13,11 +13,13 @@ def main():
     parser.add_argument('input_path', nargs='?', help='Path or URL to process')
     parser.add_argument('--exclude', '-e', action='append', help='Directories to exclude (can be used multiple times)')
     parser.add_argument('--max-tokens', '-m', type=int, help='Maximum number of tokens per file')
+    parser.add_argument('--output-dir', '-o', help='Directory to store output files')
     
     args = parser.parse_args()
     input_path = args.input_path
     excluded_dirs = set(args.exclude) if args.exclude else set()
     max_tokens = args.max_tokens
+    output_dir = args.output_dir
 
     if not input_path:
         intro_text = Text("\nInput Paths or URLs Processed:\n", style="dodger_blue1")
@@ -50,7 +52,7 @@ def main():
     working_dir = os.getcwd()
     
     try:
-        process_input(input_path, working_dir, console, excluded_dirs, max_tokens)
+        process_input(input_path, working_dir, console, excluded_dirs, max_tokens, output_dir)
     except Exception as e:
         console.print(f"\n[bold red]An error occurred:[/bold red] {str(e)}")
         console.print("\nPlease check your input and try again.")

@@ -1,9 +1,11 @@
 onefilellm/
+├── src/
+│   └── onefilellm/
+│       ├── __init__.py
+│       ├── cli.py
+│       ├── processor.py
+│       └── utils.py
 ├── setup.py
 ├── pyproject.toml
 ├── requirements.txt
-├── install.sh
-├── onefilellm/
-│   ├── __init__.py
-│   ├── cli.py           # Command-line interface
-│   └── processor.py     # Core processing logic
+└── install.sh

@@ -169,7 +169,7 @@ def process_local_directory(local_path, output):
 
                 output.write("\n\n")
 
-def process_github_repo(repo_url):
+def process_github_repo(repo_url, excluded_dirs=None):
     api_base_url = "https://api.github.com/repos/"
     repo_url_parts = repo_url.split("https://github.com/")[-1].split("/")
     repo_name = "/".join(repo_url_parts[:2])
@@ -190,7 +190,17 @@ def process_github_repo(repo_url):
         files = response.json()
 
         for file in files:
+            # Skip excluded directories
+            if file["type"] == "dir" and excluded_dirs and should_exclude_path(file["path"], "", excluded_dirs):
+                print(f"Skipping excluded directory: {file['path']}")
+                continue
+                
             if file["type"] == "file" and is_allowed_filetype(file["name"]):
+                # Skip files in excluded directories
+                if excluded_dirs and should_exclude_path(file["path"], "", excluded_dirs):
+                    print(f"Skipping file in excluded directory: {file['path']}")
+                    continue
+                    
                 print(f"Processing {file['path']}...")
 
                 temp_file = f"temp_{file['name']}"
@@ -215,32 +225,58 @@ def process_github_repo(repo_url):
 
     return "\n".join(repo_content)
 
-def process_local_folder(local_path):
-    def process_local_directory(local_path):
-        content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
-        for root, dirs, files in os.walk(local_path):
-            for file in files:
-                if is_allowed_filetype(file):
-                    print(f"Processing {os.path.join(root, file)}...")
+def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
+    content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
+    excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
+    
+    for root, dirs, files in os.walk(local_path):
+        # Filter out excluded directories
+        dirs[:] = [d for d in dirs if not should_exclude_path(
+            os.path.join(root, d), 
+            local_path, 
+            excluded_dirs
+        )]
+        
+        # Skip this directory if it should be excluded
+        if should_exclude_path(root, local_path, excluded_dirs):
+            continue
+            
+        for file in files:
+            if is_allowed_filetype(file):
+                file_path = os.path.join(root, file)
+                if should_exclude_path(file_path, local_path, excluded_dirs):
+                    continue
+                    
+                print(f"Processing {file_path}...")
 
-                    file_path = os.path.join(root, file)
-                    relative_path = os.path.relpath(file_path, local_path)
-                    content.append(f'<file name="{escape_xml(relative_path)}">')
+                relative_path = os.path.relpath(file_path, local_path)
+                content.append(f'<file name="{escape_xml(relative_path)}">')
 
-                    if file.endswith(".ipynb"):
-                        content.append(escape_xml(process_ipynb_file(file_path)))
-                    else:
-                        with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
-                            content.append(escape_xml(f.read()))
+                if file.endswith(".ipynb"):
+                    file_content = process_ipynb_file(file_path)
+                else:
+                    with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
+                        file_content = f.read()
+                
+                # Truncate content if needed
+                file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
+                
+                # Get token count for this file
+                file_token_count = get_token_count(file_content)
+                if was_truncated:
+                    print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
+                else:
+                    print(f"Token count: {file_token_count}")
+                
+                if was_truncated:
+                    content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
+                
+                content.append(escape_xml(file_content))
+                content.append('</file>')
 
-                    content.append('</file>')
-
-        content.append('</source>')
-        return '\n'.join(content)
-
-    formatted_content = process_local_directory(local_path)
+    content.append('</source>')
     print("All files processed.")
-    return formatted_content
+    return '\n'.join(content)
 
 def process_arxiv_pdf(arxiv_abs_url):
     pdf_url = arxiv_abs_url.replace("/abs/", "/pdf/") + ".pdf"
@@ -494,7 +530,7 @@ def process_doi_or_pmid(identifier):
         print("Sci-hub appears to be inaccessible or the document was not found. Please try again later.")
         return error_text
         
-def process_github_pull_request(pull_request_url):
+def process_github_pull_request(pull_request_url, excluded_dirs=None):
     url_parts = pull_request_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -547,7 +583,7 @@ def process_github_pull_request(pull_request_url):
     formatted_text += '</pull_request_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url)
+    repo_content = process_github_repo(repo_url, excluded_dirs)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -569,7 +605,7 @@ def escape_xml(text):
         # .replace("'", "&apos;")
     )
 
-def process_github_issue(issue_url):
+def process_github_issue(issue_url, excluded_dirs=None):
     url_parts = issue_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -619,7 +655,7 @@ def process_github_issue(issue_url):
     formatted_text += '</issue_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url)
+    repo_content = process_github_repo(repo_url, excluded_dirs)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -629,3 +665,13 @@ def process_github_issue(issue_url):
     print(f"Issue {issue_number} and repository content processed successfully.")
 
     return formatted_text
+
+def get_source_name(input_path):
+    """Generate a name for the output files based on the input source"""
+    if "github.com" in input_path:
+        parts = input_path.split("github.com/")[-1].split("/")
+        if len(parts) >= 2:
+            return f"{parts[0]}_{parts[1]}"
+    elif os.path.isdir(input_path):
+        return os.path.basename(input_path)
+    return "output"

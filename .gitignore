@@ -1,6 +1,8 @@
 # Outputs
 *_output.txt
 processed_urls.txt
+*_compressed.txt
+*_urls.txt
 
 # Env
 .env
@@ -121,3 +123,4 @@ temp_*
 # OS specific
 .DS_Store
 Thumbs.db
+output/*

@@ -24,4 +24,8 @@ dependencies = [
 ]
 
 [project.scripts]
-onefilellm = "onefilellm.cli:main" 
+onefilellm = "onefilellm.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["onefilellm"] 
