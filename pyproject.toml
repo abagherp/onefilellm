@@ -16,11 +16,13 @@ dependencies = [
     "nltk",
     "nbformat",
     "nbconvert",
+    "ipython",
     "youtube_transcript_api",
     "pyperclip",
     "wget",
     "tqdm",
-    "rich"
+    "rich",
+    "lxml",
 ]
 
 [project.scripts]

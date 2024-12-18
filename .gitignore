@@ -124,3 +124,5 @@ temp_*
 .DS_Store
 Thumbs.db
 output/*
+aspect_analysis_uncompressed.txt
+output_uncompressed.txt

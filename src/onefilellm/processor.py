@@ -11,7 +11,7 @@ from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from onefilellm.utils import (
     process_github_pull_request, process_github_issue, process_github_repo, fetch_youtube_transcript, process_arxiv_pdf, 
     crawl_and_extract_text, process_doi_or_pmid, escape_xml, truncate_text_to_tokens, should_exclude_path, is_allowed_filetype, 
-    process_ipynb_file, get_token_count, preprocess_text, safe_file_read
+    process_ipynb_file, get_token_count, preprocess_text, safe_file_read, process_local_folder
 )
 
 # Download NLTK data and initialize stop words
@@ -19,7 +19,6 @@ nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words("english"))
 
 # Constants
-DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
 
 TOKEN = os.getenv('GITHUB_TOKEN', 'default_token_here')
 if TOKEN == 'default_token_here':

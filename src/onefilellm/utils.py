@@ -14,8 +14,20 @@ from youtube_transcript_api.formatters import TextFormatter
 import wget
 from rich import print
 import xml.etree.ElementTree as ET
+from fnmatch import fnmatch
+from .constants import (
+    DEFAULT_EXCLUDED_DIRS,
+    ALLOWED_EXTENSIONS,
+    EXCLUDED_FILES,
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_ENCODING
+)
+
+DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
+
 
 def safe_file_read(filepath, fallback_encoding='latin1'):
+    """Safely read a file with UTF-8 encoding, falling back to latin1"""
     try:
         with open(filepath, "r", encoding='utf-8') as file:
             return file.read()
@@ -39,17 +51,22 @@ def download_file(url, target_path):
         f.write(response.content)
 
 def is_allowed_filetype(filename):
-    allowed_extensions = ['.py', '.txt', '.js', '.tsx', '.ts', '.md', '.cjs', '.html', '.json', '.ipynb', '.h', '.localhost', '.sh', '.yaml', '.example']
-    exluded_files = ['compressed_output.txt', 'uncompressed_output.txt', 'processed_urls.txt', 'instruction.md', 'instructions.md']
-    return any(filename.endswith(ext) for ext in allowed_extensions) and not any(filename.endswith(file) for file in exluded_files)
+    """Check if a file should be processed based on extension"""
+    return any(filename.endswith(ext) for ext in ALLOWED_EXTENSIONS) and \
+           not any(fnmatch(filename, pattern) for pattern in EXCLUDED_FILES)
 
 def process_ipynb_file(temp_file):
-    with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
-        notebook_content = f.read()
+    """Convert Jupyter notebook to Python code"""
+    try:
+        with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
+            notebook_content = f.read()
 
-    exporter = PythonExporter()
-    python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
-    return python_code
+        exporter = PythonExporter()
+        python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
+        return python_code
+    except Exception as e:
+        print(f"Warning: Error processing notebook {temp_file}: {str(e)}")
+        return f"# Error processing notebook: {str(e)}"
 
 def escape_xml(text):
     return (
@@ -60,19 +77,13 @@ def escape_xml(text):
     )
 
 def truncate_text_to_tokens(text, max_tokens):
-    """
-    Truncate text to a maximum number of tokens.
-    Returns the truncated text and whether truncation occurred.
-    """
+    """Truncate text to max tokens"""
     if not max_tokens:
         return text, False, 100
-        
-    enc = tiktoken.get_encoding("cl100k_base")
+    enc = tiktoken.get_encoding(DEFAULT_ENCODING)
     tokens = enc.encode(text)
-    
     if len(tokens) <= max_tokens:
         return text, False, 100
-        
     truncated_tokens = tokens[:max_tokens]
     return enc.decode(truncated_tokens), True, 100*round(len(truncated_tokens)/len(tokens), 2)
 
@@ -113,14 +124,6 @@ def should_exclude_path(path, base_path, excluded_dirs):
                 return True
     
     return False    
-
-def process_ipynb_file(temp_file):
-    with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
-        notebook_content = f.read()
-
-    exporter = PythonExporter()
-    python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
-    return python_code
 
 def process_directory(url, output):
     response = requests.get(url, headers=headers)
@@ -226,18 +229,17 @@ def process_github_repo(repo_url, excluded_dirs=None):
     return "\n".join(repo_content)
 
 def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
+    """Process a local directory and its files"""
     content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
     excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
     
     for root, dirs, files in os.walk(local_path):
-        # Filter out excluded directories
         dirs[:] = [d for d in dirs if not should_exclude_path(
             os.path.join(root, d), 
             local_path, 
             excluded_dirs
         )]
         
-        # Skip this directory if it should be excluded
         if should_exclude_path(root, local_path, excluded_dirs):
             continue
             
@@ -377,21 +379,12 @@ def preprocess_text(input_file, output_file):
             out_file.write(processed_text)
         print("XML parsing failed. Text preprocessing completed without XML structure.")
 
-def get_token_count(text, disallowed_special=[], chunk_size=1000):
-    enc = tiktoken.get_encoding("cl100k_base")
-
-    # Remove XML tags
+def get_token_count(text, disallowed_special=[], chunk_size=DEFAULT_CHUNK_SIZE):
+    """Count tokens in text"""
+    enc = tiktoken.get_encoding(DEFAULT_ENCODING)
     text_without_tags = re.sub(r'<[^>]+>', '', text)
-
-    # Split the text into smaller chunks
     chunks = [text_without_tags[i:i+chunk_size] for i in range(0, len(text_without_tags), chunk_size)]
-    total_tokens = 0
-
-    for chunk in chunks:
-        tokens = enc.encode(chunk, disallowed_special=disallowed_special)
-        total_tokens += len(tokens)
-    
-    return total_tokens
+    return sum(len(enc.encode(chunk, disallowed_special=disallowed_special)) for chunk in chunks)
 
 def is_same_domain(base_url, new_url):
     return urlparse(base_url).netloc == urlparse(new_url).netloc

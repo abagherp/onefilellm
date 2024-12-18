@@ -1,0 +1,5084 @@
+<source type="local_directory" path="/Users/abagherpour/pxp/repos/note-taker">
+<file name="requirements.txt">
+# Core Dependencies
+pydantic&gt;=2.0.0
+python-dotenv&gt;=1.0.0
+pyyaml&gt;=6.0.1
+
+# LangChain &amp; LLMs
+langchain-core&gt;=0.1.20
+langchain-openai&gt;=0.0.5
+langchain-google-genai&gt;=0.0.6
+langgraph&gt;=0.1.45
+
+# Model Providers
+openai&gt;=1.10.0
+google-generativeai&gt;=0.3.0
+
+# Audio Processing
+deepgram-sdk&gt;=3.0,&lt;4.0
+pydub&gt;=0.25.1
+
+# Web Interface
+gradio&gt;=4.0.0
+
+# Utilities
+python-slugify&gt;=8.0.1
+youtube-transcript-api&gt;=0.6.2
+psycopg2&gt;=2.9.0  # Added for Postgres
+
+# Development Tools
+black&gt;=24.1.1
+ruff&gt;=0.2.1
+mypy&gt;=1.8.0
+
+# Testing
+pytest&gt;=7.0.0
+fastapi
+uvicorn
+python-multipart
+pydantic
+</file>
+<file name="README.md">
+---
+title: TherapyNote
+app_file: app.py
+sdk: gradio
+sdk_version: 5.9.0
+organization: pxpab
+---
+# Therapy Session Analysis Pipeline
+
+A Python-based project for analyzing therapy sessions from transcripts, YouTube videos, or audio recordings, and generating structured therapy notes. It also provides a dashboard interface for client/session management, analytics, administrative tasks (coding, billing), and clinical decision support.
+
+## Features
+
+- **Structured Note Generation:** Convert raw transcripts (text, YouTube captions, or audio) into standardized clinical notes (SOAP, DAP, BIRP, etc.).
+- **LLM Integration:** Uses OpenAI or Google Gemini via LangChain and LangGraph to parse and structure therapist notes.
+- **Dashboard UI:** A newly integrated dashboard (using the mockup from `mockup/DashboardLayout.jsx`) in `/dashboard` route for managing clients, sessions, analytics, and resources.
+- **Database Integration (PostgreSQL):** A relational database schema for storing clients, sessions, transcripts, notes, diagnoses, billing entries, and recommended resources.
+- **Caching &amp; Persistence:** Transcripts, notes, and extraction results cached in PostgreSQL for faster repeated requests.
+
+## Prerequisites
+
+- Python 3.9+
+- Node.js 16+
+- PostgreSQL (for database)
+- OpenAI or Google API keys if using their LLMs.
+
+## Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/therapy-session-analysis.git
+   cd therapy-session-analysis
+   ```
+
+2. **Install Python dependencies:**
+   ```bash
+   uv pip install -r requirements.txt
+   ```
+
+3. **Install Frontend dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+4. **Environment Variables:**
+   - Copy `.env.example` to `.env` and fill in:
+     ```bash
+     cp .env.example .env
+     ```
+     Set:
+     - `OPENAI_API_KEY` or `GOOGLE_API_KEY`
+     - `DATABASE_URL` in the format: `postgresql://user:password@localhost:5432/theranote_db`
+     - Other keys as needed.
+
+   Example:
+   ```bash
+   export OPENAI_API_KEY="your-openai-key"
+   export DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/theranote_db"
+   export LANGCHAIN_API_KEY="your-langchain-key"
+   export LANGCHAIN_TRACING_V2="true"
+   ```
+
+## Database Setup
+
+1. **Create PostgreSQL Database:**
+   Ensure PostgreSQL is running. Create a database:
+   ```bash
+   createdb theranote_db
+   ```
+
+2. **Apply the schema:**
+   ```bash
+   psql -d theranote_db -f database/schema.sql
+   ```
+
+3. **Insert mock data:**
+   ```bash
+   psql -d theranote_db -f database/mock_data.sql
+   ```
+
+Your database now has sample clients, sessions, transcripts, notes, diagnoses, billing entries, and resources.
+
+## Running Backend
+
+```bash
+uv pip install -r requirements.txt
+python app.py --help
+```
+
+You can run `main.py` or `app.py` depending on your usage. The `app.py` script accepts arguments to process inputs. For a web interface, run `gradio` or the chosen web server.
+
+Example:
+```bash
+python app.py --mode note --input-text "This is a sample therapy transcript..." --form-type "SOAP" --input-type "text"
+```
+
+For the caching and LLM extraction, the project now uses PostgreSQL via `utils/cache.py`.
+
+## Running Frontend
+
+From the `frontend` directory:
+```bash
+npm run dev
+```
+Then visit `http://localhost:3000`.
+
+- **Note Generation Page:** `/` (the original page)
+- **Dashboard Interface:** `/dashboard` (new UI design integrated)
+
+## Testing
+
+- Run tests with `pytest`:
+  ```bash
+  pytest
+  ```
+
+Make sure environment variables (like `OPENAI_API_KEY`) are set.
+
+## Project Structure
+
+```
+project/
+├── database/
+│   ├── schema.sql
+│   └── mock_data.sql
+├── config/
+│   ├── __init__.py
+│   ├── settings.py
+│   └── ...
+├── forms/
+│   ├── schemas.py
+│   ├── entities.py
+│   └── ...
+├── langhub/
+│   ├── prompts/
+│   └── ...
+├── mockup/
+│   ├── ProjectOverview.md
+│   ├── DashboardLayout.jsx
+│   ├── database.md
+│   └── ...
+├── utils/
+│   ├── cache.py  (Updated to Postgres)
+│   ├── youtube.py
+│   ├── audio.py
+│   ├── text_processing.py
+│   └── transcription.py
+├── models/
+│   ├── llm_provider.py
+│   └── ...
+├── app.py (Updated caching)
+├── main.py
+├── requirements.txt (Updated)
+├── README.md (Updated)
+└── frontend/
+    ├── src/app/dashboard/page.tsx (New dashboard UI)
+    ├── package.json (Updated to include recharts)
+    └── ...
+```
+
+## Additional Notes
+
+- The new dashboard layout provides a comprehensive UI for client/session management, analytics, and more. It uses `recharts` for charts and `lucide-react` for icons.
+- For clinical decision support and additional features described in `mockup/ProjectOverview.md`, the architecture is ready. The next steps would be to implement corresponding endpoints and integrate them with the dashboard UI.
+- Ensure that `DATABASE_URL` is properly set so the backend can connect to PostgreSQL.  
+- The `utils/cache.py` now stores cached extractions and transcripts in the main PostgreSQL database instead of a local SQLite file.
+
+## License
+
+2024 all rights reserved to Pressn'Xpress
+```
+</file>
+<file name="app.py">
+from __future__ import annotations
+from fastapi import FastAPI, Form, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import Optional, List
+import uvicorn
+import yaml
+import json
+from pydantic import BaseModel
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Database connection
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=os.getenv("DB_NAME", "note_taker"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", ""),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        cursor_factory=RealDictCursor
+    )
+
+from forms.schemas import (
+    SOAPNote, DAPNote, BIRPNote, PIRPNote, GIRPNote, SIRPNote,
+    FAIRFDARPNote, DARENote, PIENote, SOAPIERNote, SOAPIENote,
+    POMRNote, NarrativeNote, CBENote, SBARNote
+)
+from forms.entities import EntitiesExtractionResult
+from utils.youtube import download_transcript, extract_youtube_video_id
+from utils.audio import transcribe_audio
+from models.llm_provider import get_llm
+from utils.cache import CacheManager
+
+# Response Models
+class GenerateResponse(BaseModel):
+    note: str
+
+class ExtractResponse(BaseModel):
+    entities: str
+
+class Client(BaseModel):
+    client_id: int
+    first_name: str
+    last_name: str
+    email: Optional[str]
+    age: Optional[int]
+    primary_issue: Optional[str]
+
+class Session(BaseModel):
+    session_id: int
+    client_id: int
+    date: str
+    status: str
+    notes: Optional[str]
+    modality: str
+    client_name: str
+    therapist_name: str
+    presenting_problem: Optional[str]
+
+class BillingEntry(BaseModel):
+    session_id: int
+    cpt_code: str
+    amount: float
+    status: str
+
+# Add Note model
+class Note(BaseModel):
+    session_id: int
+    content: str
+    type: str
+    created_at: str
+
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+FORM_SCHEMAS = {
+    "SOAP": SOAPNote,
+    "DAP": DAPNote,
+    "BIRP": BIRPNote,
+    "PIRP": PIRPNote,
+    "GIRP": GIRPNote,
+    "SIRP": SIRPNote,
+    "FAIR/F-DARP": FAIRFDARPNote,
+    "DARE": DARENote,
+    "PIE": PIENote,
+    "SOAPIER": SOAPIERNote,
+    "SOAPIE": SOAPIENote,
+    "POMR": POMRNote,
+    "Narrative": NarrativeNote,
+    "CBE": CBENote,
+    "SBAR": SBARNote,
+}
+
+cache = CacheManager()
+
+@app.post("/generate", response_model=GenerateResponse)
+async def generate_note(
+    inputText: str = Form(...),
+    formType: str = Form(...),
+    inputType: str = Form("text"),
+    audioFile: Optional[UploadFile] = File(None),
+    forceRefresh: bool = Form(False)
+):
+    try:
+        audio_file_path = None
+        if inputType == "audio" and audioFile:
+            # Save audio temporarily
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+                data = await audioFile.read()
+                f.write(data)
+                audio_file_path = f.name
+
+        # Validate form type
+        if formType not in FORM_SCHEMAS:
+            return JSONResponse(
+                content={"error": f"Unsupported form type: {formType}. Available types: {', '.join(FORM_SCHEMAS.keys())}"},
+                status_code=400
+            )
+
+        # Process the input
+        result = process_input(inputText, formType, inputType, audio_file_path, forceRefresh)
+        
+        # Check if result is a dictionary with error
+        if isinstance(result, dict) and "error" in result:
+            return JSONResponse(content=result, status_code=400)
+            
+        return {"note": result}
+        
+    except Exception as e:
+        print(f"Error generating note: {str(e)}")  # Add logging
+        return JSONResponse(
+            content={"error": f"Failed to generate note: {str(e)}"},
+            status_code=500
+        )
+    finally:
+        # Cleanup temporary audio file if it exists
+        if audio_file_path and os.path.exists(audio_file_path):
+            try:
+                os.unlink(audio_file_path)
+            except:
+                pass
+
+@app.post("/extract", response_model=ExtractResponse)
+async def extract_entities(
+    inputText: str = Form(...),
+    inputType: str = Form("text"),
+    audioFile: Optional[UploadFile] = File(None)
+):
+    audio_file_path = None
+    if inputType == "audio" and audioFile:
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            data = await audioFile.read()
+            f.write(data)
+            audio_file_path = f.name
+
+    result = process_entities(inputText, inputType, audio_file_path)
+    return {"entities": result}
+
+@app.get("/clients")
+async def get_clients():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT ON (first_name, last_name)
+                client_id, 
+                first_name, 
+                last_name, 
+                email, 
+                age, 
+                primary_presentation as primary_issue
+            FROM clients
+            ORDER BY first_name, last_name, client_id DESC
+        """)
+        clients = cur.fetchall()
+        
+        # Transform the data to match the frontend's expected structure
+        transformed_clients = [{
+            'id': client['client_id'],
+            'name': f"{client['first_name']} {client['last_name']}".strip(),
+            'first_name': client['first_name'],
+            'last_name': client['last_name'],
+            'age': client['age'],
+            'contact': client['email'],
+            'primaryIssue': client['primary_issue']
+        } for client in clients]
+        
+        cur.close()
+        conn.close()
+        return {"clients": transformed_clients}
+    except Exception as e:
+        print(f"Error in get_clients: {str(e)}")  # Add logging
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/sessions")
+async def get_sessions():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT 
+                s.session_id,
+                s.client_id,
+                s.session_date,
+                s.status,
+                s.modality,
+                s.presenting_problem,
+                CONCAT(c.first_name, ' ', c.last_name) as client_name,
+                CONCAT(t.first_name, ' ', t.last_name) as therapist_name
+            FROM sessions s
+            JOIN clients c ON s.client_id = c.client_id
+            JOIN therapists t ON s.therapist_id = t.therapist_id
+            ORDER BY s.session_date DESC
+        """)
+        sessions = cur.fetchall()
+        
+        # Transform the data to match the frontend's expected structure
+        transformed_sessions = [{
+            'session_id': session['session_id'],
+            'session_date': session['session_date'].isoformat() if session['session_date'] else None,
+            'client_name': session['client_name'],
+            'therapist_name': session['therapist_name'],
+            'modality': session['modality'],
+            'presenting_problem': session['presenting_problem'],
+            'status': session['status']
+        } for session in sessions]
+        
+        cur.close()
+        conn.close()
+        return {"sessions": transformed_sessions}
+    except Exception as e:
+        print(f"Error in get_sessions: {str(e)}")  # Add logging
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/sessions/{session_id}")
+async def get_session_details(session_id: int):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT 
+                s.session_id,
+                s.client_id,
+                s.session_date,
+                s.status,
+                s.modality,
+                s.presenting_problem,
+                s.transcript,
+                CONCAT(c.first_name, ' ', c.last_name) as client_name,
+                CONCAT(t.first_name, ' ', t.last_name) as therapist_name
+            FROM sessions s
+            JOIN clients c ON s.client_id = c.client_id
+            JOIN therapists t ON s.therapist_id = t.therapist_id
+            WHERE s.session_id = %s
+        """, (session_id,))
+        session = cur.fetchone()
+        
+        if not session:
+            return JSONResponse(
+                content={"error": "Session not found"},
+                status_code=404
+            )
+        
+        # Transform the data
+        transformed_session = {
+            'session_id': session['session_id'],
+            'session_date': session['session_date'].isoformat() if session['session_date'] else None,
+            'client_name': session['client_name'],
+            'therapist_name': session['therapist_name'],
+            'modality': session['modality'],
+            'presenting_problem': session['presenting_problem'],
+            'transcript': session['transcript'],
+            'status': session['status']
+        }
+        
+        cur.close()
+        conn.close()
+        return {"session": transformed_session}
+    except Exception as e:
+        print(f"Error in get_session_details: {str(e)}")
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/diagnoses")
+async def get_diagnoses():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT ON (client_id, diagnosis_code)
+                diagnosis_id, client_id, diagnosis_code as code,
+                diagnosis_description as description,
+                confidence_score as confidence,
+                created_at as date_diagnosed
+            FROM diagnoses
+            ORDER BY client_id, diagnosis_code, created_at DESC
+        """)
+        diagnoses = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"diagnoses": diagnoses}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/templates")
+async def get_templates():
+    try:
+        # Return templates based on FORM_SCHEMAS
+        templates = [{"name": name, "format": schema.__name__} for name, schema in FORM_SCHEMAS.items()]
+        return {"templates": templates}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/resources")
+async def get_resources():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT sr.resource_id as id, s.client_id,
+                   sr.resource_type as type,
+                   sr.resource_link as link,
+                   CONCAT(t.first_name, ' ', t.last_name) as recommended_by
+            FROM session_resources sr
+            JOIN sessions s ON sr.session_id = s.session_id
+            JOIN therapists t ON sr.recommended_by = t.therapist_id
+            ORDER BY sr.created_at DESC
+        """)
+        resources = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"resources": resources}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/progress")
+async def get_progress():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT progress_id as id, client_id,
+                   month_label as month,
+                   gad7_score
+            FROM progress_metrics
+            ORDER BY created_at DESC
+        """)
+        progress = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"progress": progress}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/billing")
+async def get_billing():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT ON (session_id, cpt_code)
+                session_id, cpt_code, amount, billing_status as status
+            FROM billing_entries
+            ORDER BY session_id, cpt_code, created_at DESC
+        """)
+        billing = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"billing": billing}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/insights")
+async def get_insights():
+    try:
+        insights = [
+            {
+                "client_id": 1,
+                "date": "2024-01-20",
+                "sentiment_score": 0.75,
+                "key_themes": ["anxiety management", "work stress", "family relationships"],
+                "progress_indicators": {
+                    "engagement": "high",
+                    "homework_completion": "moderate",
+                    "symptom_improvement": "positive"
+                },
+                "session_metrics": {
+                    "attendance_rate": 0.9,
+                    "cancellation_rate": 0.1,
+                    "average_session_duration": 50
+                }
+            },
+            {
+                "client_id": 2,
+                "date": "2024-01-15",
+                "sentiment_score": 0.65,
+                "key_themes": ["mood regulation", "social support", "self-care"],
+                "progress_indicators": {
+                    "engagement": "moderate",
+                    "homework_completion": "high",
+                    "symptom_improvement": "moderate"
+                },
+                "session_metrics": {
+                    "attendance_rate": 0.85,
+                    "cancellation_rate": 0.15,
+                    "average_session_duration": 45
+                }
+            },
+            {
+                "client_id": 3,
+                "date": "2024-01-18",
+                "sentiment_score": 0.7,
+                "key_themes": ["trauma processing", "coping strategies", "sleep hygiene"],
+                "progress_indicators": {
+                    "engagement": "high",
+                    "homework_completion": "moderate",
+                    "symptom_improvement": "gradual"
+                },
+                "session_metrics": {
+                    "attendance_rate": 0.95,
+                    "cancellation_rate": 0.05,
+                    "average_session_duration": 55
+                }
+            }
+        ]
+        return {"insights": insights}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.post("/notes")
+async def create_note(note: Note):
+    try:
+        conn = get_db_connection()
+        
+        # Check for duplicate note
+        if check_duplicate_note(conn, note.session_id, note.content, note.created_at):
+            return JSONResponse(
+                content={"error": "A note with these details already exists"},
+                status_code=409
+            )
+        
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO notes (session_id, note_text, created_at)
+            VALUES (%s, %s, %s)
+            RETURNING note_id
+        """, (note.session_id, note.content, note.created_at))
+        note_id = cur.fetchone()['note_id']
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"message": "Note created successfully", "note_id": note_id}
+    except Exception as e:
+        if isinstance(e, psycopg2.Error):
+            # Handle specific database errors
+            if e.pgcode == '23505':  # unique_violation
+                return JSONResponse(
+                    content={"error": "A note with these details already exists"},
+                    status_code=409
+                )
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/notes")
+async def get_notes():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT ON (n.session_id, n.note_text)
+                n.note_id, n.session_id, n.note_text as content, 'SOAP' as type,
+                n.created_at
+            FROM notes n
+            JOIN sessions s ON n.session_id = s.session_id
+            ORDER BY n.session_id, n.note_text, n.created_at DESC
+        """)
+        notes = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"notes": notes}
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+def process_input(
+    input_text: str,
+    form_type: str,
+    input_type: str = "text",
+    audio_file: str | None = None,
+    force_refresh: bool = False,
+) -&gt; str | dict:
+    try:
+        # Get transcript
+        if input_type == "audio" and audio_file:
+            transcript = transcribe_audio(audio_file)
+        elif "youtube.com" in input_text or "youtu.be" in input_text:
+            transcript = download_transcript(input_text)
+        else:
+            transcript = input_text
+
+        if not transcript:
+            return {"error": "No input text or transcript available"}
+
+        llm = get_llm()
+        schema = FORM_SCHEMAS.get(form_type)
+        if not schema:
+            return {"error": f"Unsupported form type {form_type}"}
+
+        model_name = "unknown-model"
+        try:
+            from models.llm_provider import get_model_identifier
+            model_name = get_model_identifier(llm)
+        except Exception as e:
+            print(f"Warning: Could not get model identifier: {str(e)}")
+
+        if not force_refresh:
+            cached = cache.get_extraction(transcript, form_type, model_name)
+            if cached:
+                return yaml.dump(cached, default_flow_style=False, sort_keys=False)
+
+        structured_llm = llm.with_structured_output(schema=schema)
+        response = structured_llm.invoke(transcript)
+
+        if not response:
+            return {"error": "Failed to generate note from the input"}
+
+        result_dict = response.model_dump(exclude_unset=False, exclude_none=False)
+        cache.store_extraction(transcript, form_type, result_dict, model_name)
+
+        return yaml.dump(result_dict, default_flow_style=False, sort_keys=False)
+
+    except Exception as e:
+        print(f"Error in process_input: {str(e)}")  # Add logging
+        return {"error": f"Failed to process input: {str(e)}"}
+
+def process_entities(
+    input_text: str,
+    input_type: str = "text",
+    audio_file: str | None = None,
+) -&gt; str:
+    try:
+        if input_type == "audio" and audio_file:
+            transcript = transcribe_audio(audio_file)
+        elif "youtube.com" in input_text or "youtu.be" in input_text:
+            transcript = download_transcript(input_text)
+        else:
+            transcript = input_text
+
+        llm = get_llm()
+        schema = EntitiesExtractionResult
+        structured_llm = llm.with_structured_output(schema=schema, method="json_schema")
+        response = structured_llm.invoke(transcript)
+
+        result_dict = response.model_dump(exclude_unset=True, exclude_none=True)
+        return yaml.dump(result_dict, default_flow_style=False, sort_keys=False)
+    except Exception as e:
+        return {"error": str(e)}
+
+# Add new function to check for duplicates
+def check_duplicate_client(conn, first_name: str, last_name: str, email: str | None) -&gt; bool:
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*) as count
+        FROM clients
+        WHERE first_name = %s AND last_name = %s
+        OR (email IS NOT NULL AND email = %s)
+    """, (first_name, last_name, email))
+    result = cur.fetchone()
+    cur.close()
+    return result['count'] &gt; 0
+
+def check_duplicate_session(conn, client_id: int, therapist_id: int, session_date: str) -&gt; bool:
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*) as count
+        FROM sessions
+        WHERE client_id = %s AND therapist_id = %s AND session_date = %s
+    """, (client_id, therapist_id, session_date))
+    result = cur.fetchone()
+    cur.close()
+    return result['count'] &gt; 0
+
+def check_duplicate_note(conn, session_id: int, note_text: str, created_at: str) -&gt; bool:
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*) as count
+        FROM notes
+        WHERE session_id = %s AND note_text = %s AND created_at = %s
+    """, (session_id, note_text, created_at))
+    result = cur.fetchone()
+    cur.close()
+    return result['count'] &gt; 0
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+</file>
+<file name=".env.example">
+# API Keys
+OPENAI_API_KEY=your_openai_key_here
+LANGCHAIN_API_KEY=your_langchain_key_here
+GOOGLE_API_KEY=your_google_key_here
+DEEPGRAM_API_KEY=your_deepgram_key_here
+DATABASE_URL="postgresql://postgres:password@localhost:5432/theranote_db"
+
+# Model Configuration
+MODEL_PROVIDER=google_gemini  # or openai
+LANGCHAIN_TRACING_V2=true
+
+# Authentication
+ADMIN_PASSWORD=change_this_password
+USER1_PASSWORD=change_this_password
+
+# Deployment
+HF_TOKEN=your_huggingface_token 
+</file>
+<file name="main.py">
+from __future__ import annotations
+import os
+from pathlib import Path
+import yaml
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableSequence
+
+from config.settings import settings
+from forms.schemas import (
+    SOAPNote,
+    DAPNote,
+    BIRPNote,
+    PIRPNote,
+    GIRPNote,
+    SIRPNote,
+    FAIRFDARPNote,
+    DARENote,
+    PIENote,
+    SOAPIERNote,
+    SOAPIENote,
+    POMRNote,
+    NarrativeNote,
+    CBENote,
+    SBARNote,
+)
+from utils.youtube import download_transcript
+from models.llm_provider import get_llm
+from langchain.globals import set_llm_cache
+from langchain_community.cache import SQLiteCache
+
+set_llm_cache(SQLiteCache(database_path=".langchain.db"))
+
+
+# Set environment for LangSmith tracing/logging
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+if settings.LANGCHAIN_API_KEY:
+    os.environ["LANGCHAIN_API_KEY"] = settings.LANGCHAIN_API_KEY
+
+
+def load_prompt(note_type: str) -&gt; tuple[str, str]:
+    """Load the prompt template from YAML for the specified note type."""
+    prompt_path = Path("langhub/prompts/therapy_extraction_prompt.yaml")
+    with open(prompt_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    note_prompts = data.get("prompts", {}).get(note_type.lower())
+    if not note_prompts:
+        raise ValueError(f"No prompt template found for note type: {note_type}")
+
+    return note_prompts["system"], note_prompts["human"]
+
+
+def create_extraction_chain(note_type: str = "soap") -&gt; RunnableSequence:
+    """Create a chain for extracting structured notes."""
+    print(f"Creating extraction chain for {note_type.upper()} notes...")
+
+    print("Initializing LLM...")
+    llm = get_llm()
+
+    print("Setting up schema mapping...")
+    # Select the appropriate schema based on note type
+    schema_map = {
+        "soap": SOAPNote,
+        "dap": DAPNote,
+        "birp": BIRPNote,
+        "birp_raw": BIRPNote,
+        "pirp": PIRPNote,
+        "girp": GIRPNote,
+        "sirp": SIRPNote,
+        "fair_fdarp": FAIRFDARPNote,
+        "dare": DARENote,
+        "pie": PIENote,
+        "soapier": SOAPIERNote,
+        "soapie": SOAPIENote,
+        "pomr": POMRNote,
+        "narrative": NarrativeNote,
+        "cbe": CBENote,
+        "sbar": SBARNote,
+    }
+    schema = schema_map.get(note_type.lower())
+
+    if not schema:
+        raise ValueError(f"Unsupported note type: {note_type}")
+
+    print("Creating structured LLM output...")
+    # Create structured LLM
+    structured_llm = llm.with_structured_output(schema=schema, include_raw=True)
+
+    print("Loading system prompt...")
+    # Load system prompt and human prompt for the specific note type
+    system_prompt, human_prompt = load_prompt(note_type)
+
+    print("Creating prompt template...")
+    # Create prompt template
+    prompt_template = ChatPromptTemplate.from_messages(
+        [("system", system_prompt), ("human", human_prompt)]
+    )
+
+    print("Building extraction chain...")
+    # Create the chain
+    chain = prompt_template | structured_llm
+
+    print("Extraction chain created successfully")
+    return chain
+
+
+def process_session(url: str, note_type: str = "soap") -&gt; dict:
+    """Process a single therapy session."""
+    try:
+        # Download transcript
+        print(f"Downloading transcript from {url}...")
+        transcript = download_transcript(url)
+
+        # Create extraction chain
+        chain = create_extraction_chain(note_type)
+
+        # Process transcript
+        print("Extracting structured notes...")
+        result = chain.invoke({"note_type": note_type.upper(), "text": transcript})
+
+        return result.model_dump()
+
+    except Exception as e:
+        print(f"Error processing session: {str(e)}")
+        return {}
+
+
+def main():
+    # Example YouTube sessions
+    sessions = [
+        {
+            "title": "CBT Role-Play – Complete Session – Part 6",
+            "url": "https://www.youtube.com/watch?v=KuHLL2AE-SE",
+        },
+        {
+            "title": "CBT Role-Play – Complete Session – Part 7",
+            "url": "https://www.youtube.com/watch?v=jS1KE3_Pqlc",
+        },
+    ]
+
+    for session in sessions:
+        print(f"\nProcessing session: {session['title']}")
+
+        # Extract notes in different formats
+        note_types = ["soap", "dap", "birp"]
+        results = {}
+
+        for note_type in note_types:
+            print(f"\nExtracting {note_type.upper()} notes...")
+            result = process_session(session["url"], note_type)
+            results[note_type] = result
+
+        # Print results
+        print(f"\nResults for '{session['title']}':")
+        for note_type, notes in results.items():
+            print(f"\n{note_type.upper()} Notes:")
+            print(yaml.dump(notes, default_flow_style=False))
+
+
+if __name__ == "__main__":
+    main()
+
+</file>
+<file name="forms/__init__.py">
+# Package initialization
+
+</file>
+<file name="forms/schemas.py">
+from __future__ import annotations
+from pydantic import BaseModel, Field
+
+from typing import Optional
+
+
+class SOAPNote(BaseModel):
+    """
+    A SOAP note is structured into four sections: Subjective, Objective, Assessment, and Plan.
+    These fields help track the client's self-reported experiences, observable data, the clinician's assessment, and the future treatment plan.
+    """
+
+    Subjective: Optional[str] = Field(
+        None,
+        description="Client's self-reported symptoms, emotions, concerns, and relevant personal history.",
+    )
+    Objective: Optional[str] = Field(
+        None,
+        description="Observable and measurable data, such as behavior, affect, test results, or vital signs.",
+    )
+    Assessment: Optional[str] = Field(
+        None,
+        description="Clinician's interpretation of the subjective and objective data, including diagnosis and progress.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Outline of next steps, changes to treatment, referrals, and any planned interventions.",
+    )
+
+
+class DAPNote(BaseModel):
+    """
+    A DAP note includes Data, Assessment, and Plan. It condenses subjective and objective info into a single 'Data' section.
+    """
+
+    Data: Optional[str] = Field(
+        None,
+        description="Combined subjective and objective information: client's statements, therapist observations, relevant tests.",
+    )
+    Assessment: Optional[str] = Field(
+        None,
+        description="Therapist's interpretation of the data, clinical impressions, and identified issues.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Next steps, goals for future sessions, and recommended interventions or activities.",
+    )
+
+
+class BIRPNote(BaseModel):
+    """
+    A BIRP note includes Behavior, Intervention, Response, and Plan, emphasizing the therapist's interventions and the client's reaction.
+    """
+
+    Behavior: Optional[str] = Field(
+        None,
+        description="Client's behavior during the session (verbal/non-verbal) and any observations made by the therapist.",
+    )
+    Intervention: Optional[str] = Field(
+        None,
+        description="Specific techniques, methods, or therapies used by the clinician during the session.",
+    )
+    Response: Optional[str] = Field(
+        None,
+        description="How the client responded to the interventions, including changes in affect, participation, or symptom relief.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Follow-up steps, homework assignments, referrals, or next session focus.",
+    )
+
+
+class PIRPNote(BaseModel):
+    """
+    A PIRP note is Problem, Intervention, Response, and Plan, focusing on a particular client problem.
+    """
+
+    Problem: Optional[str] = Field(
+        None,
+        description="The client's presenting problem, symptoms, or reason for seeking therapy.",
+    )
+    Intervention: Optional[str] = Field(
+        None,
+        description="Actions taken by the therapist to address the identified problem.",
+    )
+    Response: Optional[str] = Field(
+        None,
+        description="Client's reaction or changes after the intervention was applied.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Next steps for addressing the problem, including future sessions, techniques, or referrals.",
+    )
+
+
+class GIRPNote(BaseModel):
+    """
+    A GIRP note focuses on Goals, Intervention, Response, and Plan, centering around client-defined goals.
+    """
+
+    Goals: Optional[str] = Field(
+        None,
+        description="The client's short-term and long-term therapy goals or objectives.",
+    )
+    Intervention: Optional[str] = Field(
+        None,
+        description="Therapeutic interventions used to help the client work toward these goals.",
+    )
+    Response: Optional[str] = Field(
+        None,
+        description="How the client responded to the interventions and their progress toward goals.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Plan for future sessions, homework, referrals, or adjustments to help achieve goals.",
+    )
+
+
+class SIRPNote(BaseModel):
+    """
+    A SIRP note organizes notes by Situation, Intervention, Response, and Plan, emphasizing the client's current situation.
+    """
+
+    Situation: Optional[str] = Field(
+        None,
+        description="The client's presenting situation, including current symptoms, concerns, and background info.",
+    )
+    Intervention: Optional[str] = Field(
+        None,
+        description="Interventions, assessments, and recommendations made during the session.",
+    )
+    Response: Optional[str] = Field(
+        None,
+        description="Client's response to the intervention, observed changes or feedback.",
+    )
+    Plan: Optional[str] = Field(
+        None,
+        description="Next steps, follow-up appointments, referrals, and any planned adjustments.",
+    )
+
+
+class FAIRFDARPNote(BaseModel):
+    """
+    A FAIR/F-DARP note includes Focus, Assessment, Intervention, Response (FAIR)
+    or Focus, Data, Action, Response, Plan (F-DARP).
+    Here we combine them: Focus, Data, Action, Response, (and optionally Plan).
+    """
+
+    Focus: Optional[str] = Field(
+        None,
+        description="Focus of the note, such as a nursing diagnosis, event, or primary concern.",
+    )
+    Data: Optional[str] = Field(
+        None,
+        description="Subjective and objective data about the client/patient condition.",
+    )
+    Action: Optional[str] = Field(
+        None,
+        description="Actions taken by the provider in response to the data (e.g., treatments, education).",
+    )
+    Response: Optional[str] = Field(
+        None, description="Client's response to the actions taken."
+    )
+    Plan: Optional[str] = Field(
+        None, description="Future steps or follow-up if using the full F-DARP format."
+    )
+
+
+class DARENote(BaseModel):
+    """
+    A DARE note stands for Data, Action, Response, Education. Emphasizes client education and their response.
+    """
+
+    Data: Optional[str] = Field(
+        None,
+        description="Subjective and objective client information and therapist's observations.",
+    )
+    Action: Optional[str] = Field(
+        None,
+        description="Specific actions, treatments, or interventions the therapist took.",
+    )
+    Response: Optional[str] = Field(
+        None,
+        description="Client's response to those actions, improvements, or changes in symptoms.",
+    )
+    Education: Optional[str] = Field(
+        None,
+        description="Education provided to the client about their condition, treatments, or coping strategies.",
+    )
+
+
+class PIENote(BaseModel):
+    """
+    A PIE note: Problem, Intervention, Evaluation. It's similar to PIRP but focuses on evaluating interventions.
+    """
+
+    Problem: Optional[str] = Field(
+        None,
+        description="Client's identified problem, whether mental health symptom or behavior issue.",
+    )
+    Intervention: Optional[str] = Field(
+        None,
+        description="What the therapist did to address the problem (techniques, strategies).",
+    )
+    Evaluation: Optional[str] = Field(
+        None,
+        description="How effective the intervention was, changes in the client, and next steps.",
+    )
+
+
+class SOAPIERNote(BaseModel):
+    """
+    A SOAPIER note expands SOAP by adding Intervention, Evaluation, and Revision sections for more comprehensive documentation.
+    """
+
+    Subjective: Optional[str] = Field(
+        None, description="Client's subjective complaints, feelings, statements."
+    )
+    Objective: Optional[str] = Field(
+        None, description="Observable, measurable data, test results, or observations."
+    )
+    Assessment: Optional[str] = Field(
+        None, description="Therapist's interpretation, diagnosis, or clinical judgment."
+    )
+    Plan: Optional[str] = Field(
+        None, description="Proposed interventions, follow-ups, or referrals."
+    )
+    Intervention: Optional[str] = Field(
+        None, description="Specific interventions implemented during the session."
+    )
+    Evaluation: Optional[str] = Field(
+        None, description="Client's response to interventions and progress made."
+    )
+    Revision: Optional[str] = Field(
+        None, description="Adjustments to the treatment plan based on evaluation."
+    )
+
+
+class SOAPIENote(BaseModel):
+    """
+    A SOAPIE note is similar to SOAPIER but only adds Intervention and Evaluation to the standard SOAP note.
+    """
+
+    Subjective: Optional[str] = Field(
+        None, description="Client's self-reported experiences and symptoms."
+    )
+    Objective: Optional[str] = Field(
+        None, description="Observable data and measurable findings."
+    )
+    Assessment: Optional[str] = Field(
+        None, description="Clinician's interpretation and clinical impressions."
+    )
+    Plan: Optional[str] = Field(
+        None, description="Planned interventions, referrals, or changes."
+    )
+    Intervention: Optional[str] = Field(
+        None, description="Interventions used during the session."
+    )
+    Evaluation: Optional[str] = Field(
+        None,
+        description="Client's response to interventions and progress toward goals.",
+    )
+
+
+class POMRNote(BaseModel):
+    """
+    POMR: Problem-Oriented Medical Record. Focuses on organizing data around problems.
+    """
+
+    Database: Optional[str] = Field(
+        None, description="Patient's history, exam findings, and relevant tests."
+    )
+    ProblemList: Optional[str] = Field(
+        None, description="All identified problems, both active and resolved."
+    )
+    InitialPlan: Optional[str] = Field(
+        None,
+        description="Initial plan to address each problem, including diagnostics or treatments.",
+    )
+    ProgressNotes: Optional[str] = Field(
+        None,
+        description="Ongoing progress, changes, and outcomes related to each problem.",
+    )
+
+
+class NarrativeNote(BaseModel):
+    """
+    A Narrative note is a free-text record, providing flexibility for a descriptive, story-like documentation.
+    """
+
+    Narrative: Optional[str] = Field(
+        None,
+        description="A free-form description of the session, events, observations, and client interactions.",
+    )
+
+
+class CBENote(BaseModel):
+    """
+    CBE: Charting By Exception. Only notes deviations from the norm.
+    """
+
+    Exceptions: Optional[str] = Field(
+        None,
+        description="Significant changes or unexpected findings from the norm, highlighting what differs.",
+    )
+
+
+class SBARNote(BaseModel):
+    """
+    SBAR: Situation, Background, Assessment, and Recommendation. Used often in quick communication contexts.
+    """
+
+    Situation: Optional[str] = Field(
+        None,
+        description="Brief description of the patient's current situation or issue.",
+    )
+    Background: Optional[str] = Field(
+        None,
+        description="Relevant background information, history, current meds, or past sessions.",
+    )
+    Assessment: Optional[str] = Field(
+        None, description="Clinician's assessment of the current condition or problem."
+    )
+    Recommendation: Optional[str] = Field(
+        None, description="Suggested next steps, treatments, referrals, or actions."
+    )
+
+
+class ExtractedNotes(BaseModel):
+    """Container for multiple note formats."""
+
+    soap: SOAPNote | None = None
+    dap: DAPNote | None = None
+    birp: BIRPNote | None = None
+    pirp: PIRPNote | None = None
+    girp: GIRPNote | None = None
+    sirp: SIRPNote | None = None
+    fairfdarp: FAIRFDARPNote | None = None
+    dare: DARENote | None = None
+    pie: PIENote | None = None
+    soapiier: SOAPIERNote | None = None
+    soapiie: SOAPIENote | None = None
+    pomr: POMRNote | None = None
+    narrative: NarrativeNote | None = None
+    cbe: CBENote | None = None
+    sbar: SBARNote | None = None
+
+</file>
+<file name="forms/entities.py">
+from __future__ import annotations
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class EntityItem(BaseModel):
+    name: str = Field(..., description="The name or label of the entity extracted.")
+    details: Optional[str] = Field(None, description="Additional context or details for this entity.")
+
+class EntitiesExtractionResult(BaseModel):
+    Summary: Optional[str] = Field(None, description="A brief summary of the session.")
+    emotion: Optional[List[EntityItem]] = Field(None, description="List of emotions identified.")
+    goal: Optional[List[EntityItem]] = Field(None, description="List of goals identified.")
+    intervention: Optional[List[EntityItem]] = Field(None, description="List of interventions used.")
+    diagnosis: Optional[List[EntityItem]] = Field(None, description="List of diagnoses discussed or suggested.")
+    topic: Optional[List[EntityItem]] = Field(None, description="List of main topics addressed.")
+    resource: Optional[List[EntityItem]] = Field(None, description="List of recommended or mentioned resources.")
+    homework: Optional[List[EntityItem]] = Field(None, description="List of homework assignments given.")
+    event: Optional[List[EntityItem]] = Field(None, description="List of specific events or incidents mentioned.")
+    sentiment: Optional[List[EntityItem]] = Field(None, description="Overall sentiment(s) expressed during the session.")
+    pattern: Optional[List[EntityItem]] = Field(None, description="List of recurring patterns or themes.")
+    progress_metric: Optional[List[EntityItem]] = Field(None, description="Indicators of progress or change over time.")
+    treatment_plan: Optional[List[EntityItem]] = Field(None, description="Treatment plans discussed or outlined.")
+    assessment_tool: Optional[List[EntityItem]] = Field(None, description="Assessment tools used or referenced.")
+    outcome: Optional[List[EntityItem]] = Field(None, description="Session outcomes or conclusions.")
+    concern: Optional[List[EntityItem]] = Field(None, description="Client concerns mentioned.")
+    note: Optional[List[EntityItem]] = Field(None, description="Therapist notes or observations.")
+    support_system: Optional[List[EntityItem]] = Field(None, description="Support systems or support people/resources referenced.")
+    behavior: Optional[List[EntityItem]] = Field(None, description="Client behaviors observed.")
+    cognitive_distortion: Optional[List[EntityItem]] = Field(None, description="Cognitive distortions identified.")
+    physical_symptom: Optional[List[EntityItem]] = Field(None, description="Physical symptoms mentioned.")
+    relational_dynamic: Optional[List[EntityItem]] = Field(None, description="Relational dynamics or patterns noted.")
+    motivation: Optional[List[EntityItem]] = Field(None, description="Motivational factors affecting the client.")
+    self_perception: Optional[List[EntityItem]] = Field(None, description="How the client perceives themselves.")
+    coping_strategy: Optional[List[EntityItem]] = Field(None, description="Coping strategies discussed or identified.")
+    barrier: Optional[List[EntityItem]] = Field(None, description="Barriers to progress mentioned.")
+
+</file>
+<file name="frontend/tailwind.config.js">
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        blue: {
+          50: "#f0f9ff",
+          100: "#e0f2fe",
+          200: "#bae6fd",
+          300: "#7dd3fc",
+          400: "#38bdf8",
+          500: "#0ea5e9",
+          600: "#0284c7",
+          700: "#0369a1",
+          800: "#075985",
+          900: "#0c4a6e",
+        },
+      },
+      fontFamily: {
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: [
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "Liberation Mono",
+          "Courier New",
+          "monospace",
+        ],
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/forms'),
+  ],
+}; 
+</file>
+<file name="frontend/next-env.d.ts">
+/// &lt;reference types="next" /&gt;
+/// &lt;reference types="next/image-types/global" /&gt;
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/building-your-application/configuring/typescript for more information.
+
+</file>
+<file name="frontend/package.json">
+{
+  "name": "note-taker-ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "lucide-react": "0.303.0",
+    "next": "^14.2.20",
+    "pg": "^8.13.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "recharts": "^2.7.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "0.5.7",
+    "@tailwindcss/typography": "0.5.10",
+    "@types/node": "20.10.6",
+    "@types/pg": "^8.11.10",
+    "@types/react": "18.2.46",
+    "@types/react-dom": "18.2.18",
+    "autoprefixer": "10.4.16",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.0.4",
+    "postcss": "8.4.32",
+    "tailwindcss": "3.4.0",
+    "typescript": "5.3.3"
+  }
+}
+
+</file>
+<file name="frontend/tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+} 
+</file>
+<file name="frontend/postcss.config.js">
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+} 
+</file>
+<file name="frontend/src/app/layout.tsx">
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'TheraNote - Therapy Note Generator',
+  description: 'Generate structured therapy notes from text, YouTube videos, or audio files',
+  other: {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  },
+};
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    &lt;html lang="en"&gt;
+      &lt;head&gt;
+        &lt;meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" /&gt;
+        &lt;meta httpEquiv="Pragma" content="no-cache" /&gt;
+        &lt;meta httpEquiv="Expires" content="0" /&gt;
+      &lt;/head&gt;
+      &lt;body className="font-sans antialiased"&gt;{children}&lt;/body&gt;
+    &lt;/html&gt;
+  );
+}
+</file>
+<file name="frontend/src/app/page.tsx">
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import {
+  Search, Bell, User, Home, Users, FileText, Calculator,
+  BarChart2, Heart, Book, Stethoscope, ChevronDown,
+  Menu, Clock, Database, AlertCircle
+} from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+type Client = {
+  client_id: number;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  age?: number;
+  primary_issue?: string;
+};
+type MergedClient = {
+  id: number;
+  name: string;
+  first_name?: string;
+  last_name?: string;
+  age: number | null;
+  contact: string | null;
+  primaryIssue: string | null;
+};
+type Session = {
+  session_id: number;
+  session_date: string;
+  client_name: string;
+  therapist_name: string;
+  modality: string;
+  location_info?: string;
+  presenting_problem?: string;
+  transcript_preview?: string;
+  status: string;
+};
+type Diagnosis = {
+  diagnosis_id: number;
+  client_id: number;
+  code: string;
+  description: string;
+  confidence: number;
+  date_diagnosed: string;
+};
+type Template = {
+  name: string;
+  format: string;
+};
+type Resource = {
+  client_id: number;
+  type: string;
+  link: string;
+  recommended_by: string;
+};
+type ProgressData = {
+  client_id: number;
+  month: string;
+  gad7_score: number;
+};
+type BillingEntry = {
+  session_id: number;
+  cpt_code: string;
+  amount: number;
+  status: string;
+};
+type Note = {
+  session_id: number;
+  content: string;
+  type: string;
+  created_at: string;
+};
+type Insight = {
+  client_id: number;
+  date: string;
+  sentiment_score: number;
+  key_themes: string[];
+  progress_indicators: {
+    engagement: string;
+    homework_completion: string;
+    symptom_improvement: string;
+  };
+  session_metrics: {
+    attendance_rate: number;
+    cancellation_rate: number;
+    average_session_duration: number;
+  };
+};
+
+export default function DashboardPage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [selectedClientId, setSelectedClientId] = useState&lt;number|null&gt;(null);
+
+  const [clients, setClients] = useState&lt;MergedClient[]&gt;([]);
+  const [sessions, setSessions] = useState&lt;Session[]&gt;([]);
+  const [diagnoses, setDiagnoses] = useState&lt;Diagnosis[]&gt;([]);
+  const [templates, setTemplates] = useState&lt;Template[]&gt;([]);
+  const [resources, setResources] = useState&lt;Resource[]&gt;([]);
+  const [progressData, setProgressData] = useState&lt;ProgressData[]&gt;([]);
+  const [billingEntries, setBillingEntries] = useState&lt;BillingEntry[]&gt;([]);
+  const [insights, setInsights] = useState&lt;Insight[]&gt;([]);
+
+  // Add new state for active subitem
+  const [activeSubitem, setActiveSubitem] = useState&lt;string | null&gt;(null);
+
+  // Fetch data from APIs
+  useEffect(() =&gt; {
+    async function fetchData() {
+      try {
+        const [clientsRes, sessionsRes, diagRes, tplRes, resRes, progRes, billRes, insightsRes] = await Promise.all([
+          fetch('http://localhost:8000/clients'),
+          fetch('http://localhost:8000/sessions'),
+          fetch('http://localhost:8000/diagnoses'),
+          fetch('http://localhost:8000/templates'),
+          fetch('http://localhost:8000/resources'),
+          fetch('http://localhost:8000/progress'),
+          fetch('http://localhost:8000/billing'),
+          fetch('http://localhost:8000/insights')
+        ]);
+
+        const clientsJson = await clientsRes.json();
+        const sessionsJson = await sessionsRes.json();
+        const diagJson = await diagRes.json();
+        const tplJson = await tplRes.json();
+        const resJson = await resRes.json();
+        const progJson = await progRes.json();
+        const billJson = await billRes.json();
+        const insightsJson = await insightsRes.json();
+
+        console.log('Clients data:', clientsJson);
+
+        // Set the clients directly from the API response
+        if (clientsJson.clients &amp;&amp; Array.isArray(clientsJson.clients)) {
+          setClients(clientsJson.clients);
+        } else {
+          console.error('Invalid clients data format:', clientsJson);
+        }
+
+        setSessions(sessionsJson.sessions || []);
+        setDiagnoses(diagJson.diagnoses || []);
+        setTemplates(tplJson.templates || []);
+        setResources(resJson.resources || []);
+        setProgressData(progJson.progress || []);
+        setBillingEntries(billJson.billing || []);
+        setInsights(insightsJson.insights || []);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const filterByClient = &lt;T extends { [key: string]: any }&gt;(arr: T[], clientKey='client_id') =&gt; {
+    if (!selectedClientId) return arr;
+    return arr.filter(item =&gt; item[clientKey] === selectedClientId);
+  };
+
+  const filterSessionsByClient = () =&gt; {
+    if (!selectedClientId) return sessions;
+    return sessions.filter(s =&gt; {
+      const clientObj = clients.find(c =&gt; c.id === selectedClientId);
+      if (!clientObj) return false;
+      const clientName = `${clientObj.first_name} ${clientObj.last_name}`.trim();
+      return s.client_name === clientName;
+    });
+  };
+
+  const filterDiagnosesByClient = () =&gt; filterByClient(diagnoses);
+  const filterResourcesByClient = () =&gt; filterByClient(resources);
+  
+  const filterNotesByClient = (): Note[] =&gt; {
+    // In a real scenario, we'd have a notes endpoint. If we had it, we would filter similarly.
+    // For now, no notes from mock. Assume notes might be empty.
+    return []; 
+  };
+
+  const filterProgressDataByClient = () =&gt; filterByClient(progressData);
+
+  const filterBillingByClient = () =&gt; {
+    if (!selectedClientId) return billingEntries;
+    // Need to filter by sessions that belong to that client
+    const clientObj = clients.find(c =&gt; c.id === selectedClientId);
+    if (!clientObj) return [];
+    const clientSessions = sessions.filter(s =&gt; s.client_name === clientObj.name).map(s =&gt; s.session_id);
+    return billingEntries.filter(b =&gt; clientSessions.includes(b.session_id));
+  };
+
+  const ClientProgressChart = () =&gt; {
+    const data = filterProgressDataByClient();
+    if (!selectedClientId || data.length === 0) {
+      return (
+        &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+          &lt;h2 className="text-lg font-medium mb-4"&gt;Client Progress (GAD-7)&lt;/h2&gt;
+          &lt;p className="text-gray-500 text-sm"&gt;Select a client with GAD-7 data to view progress.&lt;/p&gt;
+        &lt;/div&gt;
+      );
+    }
+    return (
+      &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Client Progress (GAD-7 Scores)&lt;/h2&gt;
+        &lt;div className="h-64"&gt;
+          &lt;ResponsiveContainer width="100%" height="100%"&gt;
+            &lt;LineChart data={data.map(d =&gt; ({month: d.month, gad7Score: d.gad7_score}))}&gt;
+              &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+              &lt;XAxis dataKey="month" /&gt;
+              &lt;YAxis domain={[0, 21]} /&gt;
+              &lt;Tooltip /&gt;
+              &lt;Line 
+                type="monotone" 
+                dataKey="gad7Score" 
+                stroke="#3B82F6" 
+                name="GAD-7 Score"
+              /&gt;
+            &lt;/LineChart&gt;
+          &lt;/ResponsiveContainer&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const RecentSessions = ({ title='Upcoming Sessions', sessions=[] }: { title?:string, sessions:Session[] }) =&gt; (
+    &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+      &lt;h2 className="text-lg font-medium mb-4"&gt;{title}&lt;/h2&gt;
+      {sessions.length === 0 ? (
+        &lt;p className="text-gray-500 text-sm"&gt;No sessions found.&lt;/p&gt;
+      ) : (
+        &lt;div className="space-y-4"&gt;
+          {sessions.map(session =&gt; (
+            &lt;div key={session.session_id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50"&gt;
+              &lt;div className="flex-1"&gt;
+                &lt;h3 className="text-sm font-medium"&gt;{session.client_name}&lt;/h3&gt;
+                &lt;p className="text-sm text-gray-500"&gt;{new Date(session.session_date).toLocaleString()}&lt;/p&gt;
+                &lt;p className="text-xs text-gray-400"&gt;{session.presenting_problem}&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;span className={`px-2 py-1 text-xs rounded-full ${
+                session.modality?.toLowerCase().includes('video') 
+                  ? 'bg-blue-100 text-blue-800' 
+                  : session.modality?.toLowerCase().includes('group') ? 'bg-purple-100 text-purple-800' 
+                  : session.modality?.toLowerCase().includes('phone') ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-green-100 text-green-800'
+              }`}&gt;
+                {session.modality || 'In-person'}
+              &lt;/span&gt;
+            &lt;/div&gt;
+          ))}
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+
+  const ClientList = () =&gt; {
+    const clientsToShow = selectedClientId 
+      ? clients.filter(c =&gt; c.id === selectedClientId)
+      : clients;
+    return (
+      &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Clients&lt;/h2&gt;
+        &lt;div className="space-y-3"&gt;
+          {clientsToShow.map(client =&gt; (
+            &lt;div key={client.id} className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"&gt;
+              &lt;div className="flex justify-between items-start"&gt;
+                &lt;div&gt;
+                  &lt;h3 className="text-sm font-medium"&gt;{client.name}&lt;/h3&gt;
+                  &lt;p className="text-xs text-gray-500"&gt;Age: {client.age || 'N/A'} | {client.contact || 'No Email'}&lt;/p&gt;
+                &lt;/div&gt;
+                &lt;span className="text-xs text-gray-400"&gt;View Details&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;p className="text-sm text-gray-600 mt-1"&gt;{client.primaryIssue || 'No primary issue listed'}&lt;/p&gt;
+            &lt;/div&gt;
+          ))}
+          {clientsToShow.length === 0 &amp;&amp; &lt;p className="text-gray-500 text-sm"&gt;No clients found.&lt;/p&gt;}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const DiagnosisSuggestions = () =&gt; {
+    const diag = filterDiagnosesByClient();
+    return (
+      &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Diagnosis Suggestions&lt;/h2&gt;
+        {diag.length === 0 ? (
+          &lt;p className="text-gray-500 text-sm"&gt;No diagnoses found for this client.&lt;/p&gt;
+        ) : (
+          &lt;div className="space-y-3"&gt;
+            {diag.map((diagnosis, index) =&gt; (
+              &lt;div key={index} className="p-3 border rounded-lg"&gt;
+                &lt;div className="flex justify-between items-start"&gt;
+                  &lt;div&gt;
+                    &lt;h3 className="text-sm font-medium"&gt;{diagnosis.code}&lt;/h3&gt;
+                    &lt;p className="text-sm text-gray-600"&gt;{diagnosis.description}&lt;/p&gt;
+                  &lt;/div&gt;
+                  &lt;span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full"&gt;
+                    {(diagnosis.confidence * 100).toFixed(0)}% confidence
+                  &lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+            ))}
+          &lt;/div&gt;
+        )}
+      &lt;/div&gt;
+    );
+  };
+
+  const QuickStatCard = ({ icon: Icon, title, value, subtext }: { icon:any, title:string, value:string|number, subtext:string}) =&gt; (
+    &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+      &lt;div className="flex items-center"&gt;
+        &lt;div className="p-2 bg-blue-50 rounded-lg"&gt;
+          &lt;Icon className="h-6 w-6 text-blue-600" /&gt;
+        &lt;/div&gt;
+        &lt;div className="ml-4"&gt;
+          &lt;h3 className="text-sm font-medium text-gray-900"&gt;{title}&lt;/h3&gt;
+          &lt;div className="mt-1"&gt;
+            &lt;p className="text-2xl font-semibold text-gray-900"&gt;{value}&lt;/p&gt;
+            &lt;p className="text-sm text-gray-500"&gt;{subtext}&lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const DashboardOverview = () =&gt; {
+    const sessionsFiltered = filterSessionsByClient();
+    const scheduledSessions = sessionsFiltered.filter(s =&gt; s.status?.toLowerCase() === 'scheduled');
+    const notes = filterNotesByClient();
+
+    return (
+      &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"&gt;
+        &lt;div className="col-span-1 md:col-span-2 lg:col-span-3"&gt;
+          &lt;div className="grid grid-cols-1 md:grid-cols-3 gap-4"&gt;
+            &lt;QuickStatCard
+              icon={Clock}
+              title="Today's Sessions"
+              value={selectedClientId ? scheduledSessions.length : 'N/A'}
+              subtext={selectedClientId ? 'For this client' : 'Select a client'}
+            /&gt;
+            &lt;QuickStatCard
+              icon={Database}
+              title="Pending Notes"
+              value={notes.length}
+              subtext="For selected client"
+            /&gt;
+            &lt;QuickStatCard
+              icon={AlertCircle}
+              title="Urgent Reviews"
+              value="2"
+              subtext="Treatment plans need update"
+            /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div className="col-span-1 md:col-span-2 space-y-4"&gt;
+          &lt;ClientProgressChart /&gt;
+          &lt;RecentSessions 
+            title="Upcoming Sessions"
+            sessions={scheduledSessions}
+          /&gt;
+        &lt;/div&gt;
+
+        &lt;div className="col-span-1 space-y-4"&gt;
+          &lt;ClientList /&gt;
+          &lt;DiagnosisSuggestions /&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const ClientsAndSessionsView = () =&gt; {
+    const filteredSessions = filterSessionsByClient();
+    return (
+      &lt;div className="space-y-4"&gt;
+        &lt;ClientList /&gt;
+        &lt;RecentSessions title="All Sessions" sessions={filteredSessions} /&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const DocumentationView = () =&gt; {
+    const [notes, setNotes] = useState&lt;Note[]&gt;([]);
+    const [selectedSessionId, setSelectedSessionId] = useState&lt;number | null&gt;(null);
+    const filteredSessions = filterSessionsByClient();
+
+    // In a real app, you'd fetch notes from your database
+    useEffect(() =&gt; {
+      async function fetchNotes() {
+        try {
+          const response = await fetch('http://localhost:8000/notes');
+          if (response.ok) {
+            const data = await response.json();
+            setNotes(data.notes || []);
+          }
+        } catch (error) {
+          console.error('Error fetching notes:', error);
+        }
+      }
+      fetchNotes();
+    }, []);
+
+    const filteredNotes = notes.filter(note =&gt; 
+      (!selectedSessionId || note.session_id === selectedSessionId) &amp;&amp;
+      (!selectedClientId || filteredSessions.some(s =&gt; s.session_id === note.session_id))
+    );
+
+    return (
+      &lt;div className="space-y-6"&gt;
+        &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+          &lt;div className="flex justify-between items-center mb-4"&gt;
+            &lt;h2 className="text-lg font-medium"&gt;Documentation &amp; Notes&lt;/h2&gt;
+            &lt;select
+              className="rounded-md border-gray-300 shadow-sm"
+              value={selectedSessionId || ''}
+              onChange={(e) =&gt; setSelectedSessionId(e.target.value ? Number(e.target.value) : null)}
+            &gt;
+              &lt;option value=""&gt;All Sessions&lt;/option&gt;
+              {filteredSessions.map(session =&gt; (
+                &lt;option key={session.session_id} value={session.session_id}&gt;
+                  {new Date(session.session_date).toLocaleDateString()} - {session.modality}
+                &lt;/option&gt;
+              ))}
+            &lt;/select&gt;
+          &lt;/div&gt;
+
+          &lt;div className="space-y-6"&gt;
+            {/* Notes Section */}
+            &lt;div&gt;
+              &lt;h3 className="text-md font-semibold mb-4"&gt;Session Notes&lt;/h3&gt;
+              {filteredNotes.length === 0 ? (
+                &lt;p className="text-gray-500 text-sm"&gt;No notes found for the selected criteria.&lt;/p&gt;
+              ) : (
+                &lt;div className="space-y-4"&gt;
+                  {filteredNotes.map((note, idx) =&gt; {
+                    const session = filteredSessions.find(s =&gt; s.session_id === note.session_id);
+                    return (
+                      &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+                        &lt;div className="flex justify-between items-start mb-2"&gt;
+                          &lt;div&gt;
+                            &lt;h4 className="font-medium"&gt;
+                              {session ? new Date(session.session_date).toLocaleDateString() : 'Unknown Session'}
+                            &lt;/h4&gt;
+                            &lt;p className="text-sm text-gray-500"&gt;
+                              Type: {note.type} | Created: {new Date(note.created_at).toLocaleString()}
+                            &lt;/p&gt;
+                          &lt;/div&gt;
+                        &lt;/div&gt;
+                        &lt;pre className="mt-2 text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded"&gt;
+                          {note.content}
+                        &lt;/pre&gt;
+                      &lt;/div&gt;
+                    );
+                  })}
+                &lt;/div&gt;
+              )}
+            &lt;/div&gt;
+
+            {/* Templates Section */}
+            &lt;div&gt;
+              &lt;h3 className="text-md font-semibold mb-4"&gt;Available Templates&lt;/h3&gt;
+              &lt;div className="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
+                {templates.map((template, idx) =&gt; (
+                  &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+                    &lt;h4 className="font-medium"&gt;{template.name}&lt;/h4&gt;
+                    &lt;pre className="mt-2 text-sm text-gray-600 whitespace-pre-wrap"&gt;
+                      {template.format}
+                    &lt;/pre&gt;
+                  &lt;/div&gt;
+                ))}
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const AdministrativeView = () =&gt; {
+    const bills = filterBillingByClient();
+    return (
+      &lt;div className="bg-white rounded-lg shadow p-4 space-y-4"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Administrative Assistance&lt;/h2&gt;
+        &lt;h3 className="text-md font-semibold"&gt;Billing Entries&lt;/h3&gt;
+        {bills.length === 0 ? (
+          &lt;p className="text-gray-500 text-sm"&gt;No billing entries found for this client.&lt;/p&gt;
+        ) : (
+          &lt;table className="w-full text-sm"&gt;
+            &lt;thead&gt;
+              &lt;tr className="border-b"&gt;
+                &lt;th className="text-left py-2"&gt;Session ID&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;CPT Code&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;Amount&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;Status&lt;/th&gt;
+              &lt;/tr&gt;
+            &lt;/thead&gt;
+            &lt;tbody&gt;
+              {bills.map((bill, idx) =&gt; (
+                &lt;tr key={idx} className="border-b hover:bg-gray-50"&gt;
+                  &lt;td className="py-2"&gt;{bill.session_id}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;{bill.cpt_code}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;${typeof bill.amount === 'number' ? bill.amount.toFixed(2) : Number(bill.amount).toFixed(2)}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;{bill.status}&lt;/td&gt;
+                &lt;/tr&gt;
+              ))}
+            &lt;/tbody&gt;
+          &lt;/table&gt;
+        )}
+        &lt;p className="text-gray-500 text-sm"&gt;Billing automation tools available.&lt;/p&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const AnalyticsView = () =&gt; (
+    &lt;div className="bg-white rounded-lg shadow p-4"&gt;
+      &lt;h2 className="text-lg font-medium mb-4"&gt;Analytics &amp; Reporting&lt;/h2&gt;
+      {selectedClientId 
+        ? &lt;ClientProgressChart /&gt; 
+        : &lt;p className="text-gray-500 text-sm"&gt;Select a client to view analytics.&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+
+  const InsightsView = () =&gt; {
+    const filteredInsights = selectedClientId 
+      ? insights.filter(i =&gt; i.client_id === selectedClientId)
+      : insights;
+
+    return (
+      &lt;div className="space-y-6"&gt;
+        &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+          &lt;h2 className="text-lg font-medium mb-4"&gt;Client Insight &amp; Feedback&lt;/h2&gt;
+          {filteredInsights.length === 0 ? (
+            &lt;p className="text-gray-500"&gt;Select a client to view insights.&lt;/p&gt;
+          ) : (
+            filteredInsights.map((insight, idx) =&gt; (
+              &lt;div key={idx} className="space-y-4"&gt;
+                &lt;div className="border-b pb-4"&gt;
+                  &lt;h3 className="font-medium"&gt;Session Insights&lt;/h3&gt;
+                  &lt;p className="text-sm text-gray-600"&gt;Date: {new Date(insight.date).toLocaleDateString()}&lt;/p&gt;
+                  &lt;p className="text-sm text-gray-600"&gt;
+                    Sentiment Score: {(insight.sentiment_score * 100).toFixed(0)}%
+                  &lt;/p&gt;
+                &lt;/div&gt;
+
+                &lt;div className="border-b pb-4"&gt;
+                  &lt;h3 className="font-medium"&gt;Key Themes&lt;/h3&gt;
+                  &lt;div className="flex flex-wrap gap-2 mt-2"&gt;
+                    {insight.key_themes.map((theme, i) =&gt; (
+                      &lt;span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"&gt;
+                        {theme}
+                      &lt;/span&gt;
+                    ))}
+                  &lt;/div&gt;
+                &lt;/div&gt;
+
+                &lt;div className="border-b pb-4"&gt;
+                  &lt;h3 className="font-medium"&gt;Progress Indicators&lt;/h3&gt;
+                  &lt;div className="grid grid-cols-3 gap-4 mt-2"&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Engagement&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600 capitalize"&gt;{insight.progress_indicators.engagement}&lt;/p&gt;
+                    &lt;/div&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Homework Completion&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600 capitalize"&gt;{insight.progress_indicators.homework_completion}&lt;/p&gt;
+                    &lt;/div&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Symptom Improvement&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600 capitalize"&gt;{insight.progress_indicators.symptom_improvement}&lt;/p&gt;
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+
+                &lt;div&gt;
+                  &lt;h3 className="font-medium"&gt;Session Metrics&lt;/h3&gt;
+                  &lt;div className="grid grid-cols-3 gap-4 mt-2"&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Attendance Rate&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600"&gt;{(insight.session_metrics.attendance_rate * 100).toFixed(0)}%&lt;/p&gt;
+                    &lt;/div&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Cancellation Rate&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600"&gt;{(insight.session_metrics.cancellation_rate * 100).toFixed(0)}%&lt;/p&gt;
+                    &lt;/div&gt;
+                    &lt;div&gt;
+                      &lt;p className="text-sm font-medium"&gt;Avg. Session Duration&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600"&gt;{insight.session_metrics.average_session_duration} min&lt;/p&gt;
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+            ))
+          )}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const ResourcesView = () =&gt; {
+    const resFiltered = filterResourcesByClient();
+    return (
+      &lt;div className="bg-white rounded-lg shadow p-4 space-y-4"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Client Support Resources&lt;/h2&gt;
+        {resFiltered.length === 0 ? (
+          &lt;p className="text-gray-500 text-sm"&gt;No resources found for this client.&lt;/p&gt;
+        ) : (
+          &lt;ul className="list-disc ml-5 space-y-1 text-sm"&gt;
+            {resFiltered.map((r, idx) =&gt; (
+              &lt;li key={idx}&gt;
+                &lt;span className="font-medium capitalize"&gt;{r.type}&lt;/span&gt; recommended by {r.recommended_by}: &lt;a href={r.link} className="text-blue-600 hover:underline"&gt;{r.link}&lt;/a&gt;
+              &lt;/li&gt;
+            ))}
+          &lt;/ul&gt;
+        )}
+      &lt;/div&gt;
+    );
+  };
+
+  const ClinicalView = () =&gt; {
+    const filteredDiagnoses = selectedClientId 
+      ? diagnoses.filter(d =&gt; d.client_id === selectedClientId)
+      : diagnoses;
+
+    return (
+      &lt;div className="space-y-6"&gt;
+        &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+          &lt;h2 className="text-lg font-medium mb-4"&gt;Clinical Support&lt;/h2&gt;
+          {filteredDiagnoses.length === 0 ? (
+            &lt;p className="text-gray-500"&gt;No diagnoses found for this client.&lt;/p&gt;
+          ) : (
+            &lt;div className="space-y-4"&gt;
+              &lt;h3 className="text-md font-semibold"&gt;Current Diagnosis Suggestions&lt;/h3&gt;
+              {filteredDiagnoses.map((diagnosis, idx) =&gt; (
+                &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+                  &lt;div className="flex justify-between items-start"&gt;
+                    &lt;div&gt;
+                      &lt;p className="font-medium"&gt;{diagnosis.code}&lt;/p&gt;
+                      &lt;p className="text-sm text-gray-600"&gt;{diagnosis.description}&lt;/p&gt;
+                      &lt;p className="text-xs text-gray-500"&gt;Diagnosed: {new Date(diagnosis.date_diagnosed).toLocaleDateString()}&lt;/p&gt;
+                    &lt;/div&gt;
+                    &lt;span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"&gt;
+                      {(diagnosis.confidence * 100).toFixed(0)}% confidence
+                    &lt;/span&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+              ))}
+            &lt;/div&gt;
+          )}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const navigation = [
+    { id: 'dashboard', name: 'Dashboard', icon: Home },
+    { id: 'clients', name: 'Clients &amp; Sessions', icon: Users, subitems: ['Client Profiles', 'Session Records'] },
+    { id: 'documentation', name: 'Documentation &amp; Notes', icon: FileText, subitems: ['Note Templates', 'Note Generation'] },
+    { id: 'administrative', name: 'Administrative Assistance', icon: Calculator, subitems: ['Coding Automation', 'Billing Automation'] },
+    { id: 'analytics', name: 'Analytics &amp; Reporting', icon: BarChart2, subitems: ['Progress Dashboard', 'External Reports'] },
+    { id: 'insights', name: 'Client Insight &amp; Feedback', icon: Heart, subitems: ['Sentiment Analysis', 'Session Statistics'] },
+    { id: 'resources', name: 'Client Support', icon: Book, subitems: ['Resource Library', 'Homework &amp; Exercises'] },
+    { id: 'clinical', name: 'Clinical Support', icon: Stethoscope, subitems: ['Treatment Plans', 'Diagnosis Support'] },
+  ];
+
+  // Update navigation click handler
+  const handleNavigation = (itemId: string, subitem?: string) =&gt; {
+    setActiveSection(itemId);
+    setActiveSubitem(subitem || null);
+  };
+
+  // Update content rendering based on section and subitem
+  const renderContent = () =&gt; {
+    switch(activeSection) {
+      case 'dashboard':
+        return &lt;DashboardOverview /&gt;;
+      
+      case 'clients':
+        if (activeSubitem === 'Client Profiles') {
+          return &lt;ClientProfilesView /&gt;;
+        } else if (activeSubitem === 'Session Records') {
+          return &lt;SessionRecordsView /&gt;;
+        }
+        return &lt;ClientsAndSessionsView /&gt;;
+      
+      case 'documentation':
+        if (activeSubitem === 'Note Templates') {
+          return &lt;NoteTemplatesView /&gt;;
+        } else if (activeSubitem === 'Note Generation') {
+          return &lt;NoteGenerationView /&gt;;
+        }
+        return &lt;DocumentationView /&gt;;
+      
+      case 'administrative':
+        if (activeSubitem === 'Coding Automation') {
+          return &lt;CodingAutomationView /&gt;;
+        } else if (activeSubitem === 'Billing Automation') {
+          return &lt;BillingAutomationView /&gt;;
+        }
+        return &lt;AdministrativeView /&gt;;
+      
+      case 'analytics':
+        if (activeSubitem === 'Progress Dashboard') {
+          return &lt;ProgressDashboardView /&gt;;
+        } else if (activeSubitem === 'External Reports') {
+          return &lt;ExternalReportsView /&gt;;
+        }
+        return &lt;AnalyticsView /&gt;;
+      
+      case 'insights':
+        if (activeSubitem === 'Sentiment Analysis') {
+          return &lt;SentimentAnalysisView /&gt;;
+        } else if (activeSubitem === 'Session Statistics') {
+          return &lt;SessionStatisticsView /&gt;;
+        }
+        return &lt;InsightsView /&gt;;
+      
+      case 'resources':
+        if (activeSubitem === 'Resource Library') {
+          return &lt;ResourceLibraryView /&gt;;
+        } else if (activeSubitem === 'Homework &amp; Exercises') {
+          return &lt;HomeworkExercisesView /&gt;;
+        }
+        return &lt;ResourcesView /&gt;;
+      
+      case 'clinical':
+        if (activeSubitem === 'Treatment Plans') {
+          return &lt;TreatmentPlansView /&gt;;
+        } else if (activeSubitem === 'Diagnosis Support') {
+          return &lt;DiagnosisSupportView /&gt;;
+        }
+        return &lt;ClinicalView /&gt;;
+      
+      default:
+        return &lt;DashboardOverview /&gt;;
+    }
+  };
+
+  // Add new view components for subitems
+  const ClientProfilesView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Client Profiles&lt;/h2&gt;
+        &lt;ClientList /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const SessionRecordsView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Session Records&lt;/h2&gt;
+        &lt;RecentSessions title="All Sessions" sessions={filterSessionsByClient()} /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const NoteTemplatesView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Note Templates&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          {templates.map((template, idx) =&gt; (
+            &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+              &lt;h3 className="font-medium"&gt;{template.name}&lt;/h3&gt;
+              &lt;pre className="mt-2 text-sm text-gray-600 whitespace-pre-wrap"&gt;{template.format}&lt;/pre&gt;
+            &lt;/div&gt;
+          ))}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const NoteGenerationView = () =&gt; {
+    const [selectedSession, setSelectedSession] = useState&lt;Session | null&gt;(null);
+    const [sessionTranscript, setSessionTranscript] = useState&lt;string&gt;('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [generatedNote, setGeneratedNote] = useState&lt;string | null&gt;(null);
+    const [audioFile, setAudioFile] = useState&lt;File | null&gt;(null);
+    const [noteType, setNoteType] = useState('SOAP');
+
+    // Fetch session details when a session is selected
+    const fetchSessionDetails = async (sessionId: number) =&gt; {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`http://localhost:8000/sessions/${sessionId}`);
+        if (!response.ok) throw new Error('Failed to fetch session details');
+        const data = await response.json();
+        setSessionTranscript(data.session.transcript || 'No transcript available');
+      } catch (error) {
+        console.error('Error fetching session details:', error);
+        setSessionTranscript('Failed to load session transcript');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) =&gt; {
+      e.preventDefault();
+      if (!selectedSession || !sessionTranscript) return;
+
+      setIsGenerating(true);
+      try {
+        // Generate the note
+        const formData = new FormData();
+        formData.append('formType', noteType);
+        
+        if (audioFile) {
+          formData.append('inputType', 'audio');
+          formData.append('audioFile', audioFile);
+          formData.append('inputText', ''); // Empty for audio
+        } else {
+          formData.append('inputType', 'text');
+          formData.append('inputText', sessionTranscript);
+        }
+
+        const response = await fetch('http://localhost:8000/generate', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate note');
+        }
+        
+        const data = await response.json();
+        setGeneratedNote(data.note);
+
+        // Save the note to the database
+        const noteData = {
+          session_id: selectedSession.session_id,
+          content: data.note,
+          type: noteType,
+          created_at: new Date().toISOString(),
+        };
+
+        const saveResponse = await fetch('http://localhost:8000/notes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(noteData),
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error('Failed to save note');
+        }
+
+        // Show success message or redirect to view the note
+        alert('Note generated and saved successfully!');
+        
+      } catch (error) {
+        console.error('Error generating/saving note:', error);
+        alert(error instanceof Error ? error.message : 'Failed to generate or save note. Please try again.');
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    const filteredSessions = filterSessionsByClient();
+
+    return (
+      &lt;div className="space-y-6"&gt;
+        &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+          &lt;h2 className="text-lg font-medium mb-4"&gt;Note Generation&lt;/h2&gt;
+          &lt;form onSubmit={handleSubmit} className="space-y-4"&gt;
+            {/* Session Selection */}
+            &lt;div&gt;
+              &lt;label className="block text-sm font-medium text-gray-700"&gt;Session&lt;/label&gt;
+              &lt;select 
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                onChange={(e) =&gt; {
+                  const session = filteredSessions.find(s =&gt; s.session_id === Number(e.target.value));
+                  setSelectedSession(session || null);
+                  if (session) {
+                    fetchSessionDetails(session.session_id);
+                  } else {
+                    setSessionTranscript('');
+                  }
+                }}
+                value={selectedSession?.session_id || ''}
+              &gt;
+                &lt;option value=""&gt;Select a session&lt;/option&gt;
+                {filteredSessions.map(session =&gt; (
+                  &lt;option key={session.session_id} value={session.session_id}&gt;
+                    {new Date(session.session_date).toLocaleDateString()} - {session.modality}
+                  &lt;/option&gt;
+                ))}
+              &lt;/select&gt;
+            &lt;/div&gt;
+
+            {/* Template Type Selection */}
+            &lt;div&gt;
+              &lt;label className="block text-sm font-medium text-gray-700"&gt;Template Type&lt;/label&gt;
+              &lt;select 
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                value={noteType}
+                onChange={(e) =&gt; setNoteType(e.target.value)}
+              &gt;
+                {templates.map((template, idx) =&gt; (
+                  &lt;option key={idx} value={template.name}&gt;
+                    {template.name}
+                  &lt;/option&gt;
+                ))}
+              &lt;/select&gt;
+            &lt;/div&gt;
+
+            {/* Audio File Upload */}
+            &lt;div&gt;
+              &lt;label className="block text-sm font-medium text-gray-700"&gt;Audio Recording (optional)&lt;/label&gt;
+              &lt;input
+                type="file"
+                accept="audio/*"
+                onChange={(e) =&gt; setAudioFile(e.target.files?.[0] || null)}
+                className="mt-1 block w-full text-sm text-gray-500
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-md file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-blue-50 file:text-blue-700
+                  hover:file:bg-blue-100"
+              /&gt;
+            &lt;/div&gt;
+
+            {/* Session Content Preview */}
+            {selectedSession &amp;&amp; (
+              &lt;div&gt;
+                &lt;label className="block text-sm font-medium text-gray-700"&gt;Session Transcript&lt;/label&gt;
+                &lt;div className="mt-1 p-3 bg-gray-50 rounded-md max-h-60 overflow-y-auto"&gt;
+                  {isLoading ? (
+                    &lt;p className="text-sm text-gray-500"&gt;Loading transcript...&lt;/p&gt;
+                  ) : (
+                    &lt;p className="text-sm text-gray-600 whitespace-pre-wrap"&gt;
+                      {sessionTranscript || 'No transcript available'}
+                    &lt;/p&gt;
+                  )}
+                &lt;/div&gt;
+              &lt;/div&gt;
+            )}
+
+            {/* Generate Button */}
+            &lt;div className="flex justify-end"&gt;
+              &lt;button
+                type="submit"
+                disabled={!selectedSession || !sessionTranscript || isGenerating}
+                className={`px-4 py-2 rounded-md text-white ${
+                  !selectedSession || !sessionTranscript || isGenerating
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              &gt;
+                {isGenerating ? 'Generating...' : 'Generate Note'}
+              &lt;/button&gt;
+            &lt;/div&gt;
+          &lt;/form&gt;
+
+          {/* Generated Note Display */}
+          {generatedNote &amp;&amp; (
+            &lt;div className="mt-6"&gt;
+              &lt;h3 className="text-lg font-medium mb-2"&gt;Generated Note&lt;/h3&gt;
+              &lt;div className="p-4 bg-gray-50 rounded-md"&gt;
+                &lt;pre className="whitespace-pre-wrap text-sm text-gray-600"&gt;
+                  {generatedNote}
+                &lt;/pre&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          )}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  };
+
+  const CodingAutomationView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Coding Automation&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          &lt;div className="p-4 border rounded-lg"&gt;
+            &lt;h3 className="font-medium"&gt;CPT Code Suggestions&lt;/h3&gt;
+            &lt;p className="text-sm text-gray-600 mt-2"&gt;
+              Based on session duration and content, suggested codes will appear here.
+            &lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const BillingAutomationView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Billing Automation&lt;/h2&gt;
+        {/* Reuse billing table with additional automation features */}
+        &lt;div className="space-y-4"&gt;
+          &lt;table className="w-full text-sm"&gt;
+            &lt;thead&gt;
+              &lt;tr className="border-b"&gt;
+                &lt;th className="text-left py-2"&gt;Session ID&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;CPT Code&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;Amount&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;Status&lt;/th&gt;
+                &lt;th className="text-left py-2"&gt;Actions&lt;/th&gt;
+              &lt;/tr&gt;
+            &lt;/thead&gt;
+            &lt;tbody&gt;
+              {filterBillingByClient().map((bill, idx) =&gt; (
+                &lt;tr key={idx} className="border-b hover:bg-gray-50"&gt;
+                  &lt;td className="py-2"&gt;{bill.session_id}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;{bill.cpt_code}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;${typeof bill.amount === 'number' ? bill.amount.toFixed(2) : Number(bill.amount).toFixed(2)}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;{bill.status}&lt;/td&gt;
+                  &lt;td className="py-2"&gt;
+                    &lt;button className="text-blue-600 hover:text-blue-800"&gt;Process&lt;/button&gt;
+                  &lt;/td&gt;
+                &lt;/tr&gt;
+              ))}
+            &lt;/tbody&gt;
+          &lt;/table&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const ProgressDashboardView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Progress Dashboard&lt;/h2&gt;
+        &lt;ClientProgressChart /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const ExternalReportsView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;External Reports&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          &lt;div className="p-4 border rounded-lg"&gt;
+            &lt;h3 className="font-medium"&gt;Report Generation&lt;/h3&gt;
+            &lt;p className="text-sm text-gray-600 mt-2"&gt;
+              Generate standardized reports for external stakeholders.
+            &lt;/p&gt;
+            {/* Add report generation interface */}
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const SentimentAnalysisView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Sentiment Analysis&lt;/h2&gt;
+        {insights.filter(i =&gt; selectedClientId ? i.client_id === selectedClientId : true)
+          .map((insight, idx) =&gt; (
+            &lt;div key={idx} className="p-4 border rounded-lg space-y-4"&gt;
+              &lt;div&gt;
+                &lt;h3 className="font-medium"&gt;Session Date: {new Date(insight.date).toLocaleDateString()}&lt;/h3&gt;
+                &lt;p className="text-sm text-gray-600"&gt;
+                  Sentiment Score: {(insight.sentiment_score * 100).toFixed(0)}%
+                &lt;/p&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;h4 className="font-medium"&gt;Key Themes&lt;/h4&gt;
+                &lt;div className="flex flex-wrap gap-2 mt-2"&gt;
+                  {insight.key_themes.map((theme, i) =&gt; (
+                    &lt;span key={i} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"&gt;
+                      {theme}
+                    &lt;/span&gt;
+                  ))}
+                &lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const SessionStatisticsView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Session Statistics&lt;/h2&gt;
+        {insights.filter(i =&gt; selectedClientId ? i.client_id === selectedClientId : true)
+          .map((insight, idx) =&gt; (
+            &lt;div key={idx} className="p-4 border rounded-lg space-y-4"&gt;
+              &lt;div className="grid grid-cols-3 gap-4"&gt;
+                &lt;div&gt;
+                  &lt;h3 className="font-medium"&gt;Attendance Rate&lt;/h3&gt;
+                  &lt;p className="text-2xl"&gt;{(insight.session_metrics.attendance_rate * 100).toFixed(0)}%&lt;/p&gt;
+                &lt;/div&gt;
+                &lt;div&gt;
+                  &lt;h3 className="font-medium"&gt;Cancellation Rate&lt;/h3&gt;
+                  &lt;p className="text-2xl"&gt;{(insight.session_metrics.cancellation_rate * 100).toFixed(0)}%&lt;/p&gt;
+                &lt;/div&gt;
+                &lt;div&gt;
+                  &lt;h3 className="font-medium"&gt;Avg. Duration&lt;/h3&gt;
+                  &lt;p className="text-2xl"&gt;{insight.session_metrics.average_session_duration} min&lt;/p&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const ResourceLibraryView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Resource Library&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          {filterResourcesByClient().map((resource, idx) =&gt; (
+            &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+              &lt;h3 className="font-medium capitalize"&gt;{resource.type}&lt;/h3&gt;
+              &lt;p className="text-sm text-gray-600"&gt;Recommended by: {resource.recommended_by}&lt;/p&gt;
+              &lt;a href={resource.link} className="text-blue-600 hover:underline text-sm block mt-2"&gt;
+                Access Resource
+              &lt;/a&gt;
+            &lt;/div&gt;
+          ))}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const HomeworkExercisesView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Homework &amp; Exercises&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          &lt;div className="p-4 border rounded-lg"&gt;
+            &lt;h3 className="font-medium"&gt;Assigned Exercises&lt;/h3&gt;
+            &lt;p className="text-sm text-gray-600 mt-2"&gt;
+              View and manage assigned homework and therapeutic exercises.
+            &lt;/p&gt;
+            {/* Add homework management interface */}
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const TreatmentPlansView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Treatment Plans&lt;/h2&gt;
+        &lt;div className="space-y-4"&gt;
+          &lt;div className="p-4 border rounded-lg"&gt;
+            &lt;h3 className="font-medium"&gt;Current Treatment Plan&lt;/h3&gt;
+            {/* Add treatment plan interface */}
+            &lt;div className="mt-4 space-y-2"&gt;
+              &lt;p className="text-sm font-medium"&gt;Goals:&lt;/p&gt;
+              &lt;ul className="list-disc pl-5 text-sm text-gray-600"&gt;
+                &lt;li&gt;Reduce anxiety symptoms&lt;/li&gt;
+                &lt;li&gt;Improve sleep quality&lt;/li&gt;
+                &lt;li&gt;Develop coping strategies&lt;/li&gt;
+              &lt;/ul&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  const DiagnosisSupportView = () =&gt; (
+    &lt;div className="space-y-6"&gt;
+      &lt;div className="bg-white rounded-lg shadow p-6"&gt;
+        &lt;h2 className="text-lg font-medium mb-4"&gt;Diagnosis Support&lt;/h2&gt;
+        {filterDiagnosesByClient().map((diagnosis, idx) =&gt; (
+          &lt;div key={idx} className="p-4 border rounded-lg"&gt;
+            &lt;div className="flex justify-between items-start"&gt;
+              &lt;div&gt;
+                &lt;p className="font-medium"&gt;{diagnosis.code}&lt;/p&gt;
+                &lt;p className="text-sm text-gray-600"&gt;{diagnosis.description}&lt;/p&gt;
+                &lt;p className="text-xs text-gray-500"&gt;
+                  Diagnosed: {new Date(diagnosis.date_diagnosed).toLocaleDateString()}
+                &lt;/p&gt;
+              &lt;/div&gt;
+              &lt;span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"&gt;
+                {(diagnosis.confidence * 100).toFixed(0)}% confidence
+              &lt;/span&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+
+  return (
+    &lt;div className="min-h-screen bg-gray-50"&gt;
+      {/* Top Nav */}
+      &lt;nav className="bg-white shadow-sm border-b border-gray-200"&gt;
+        &lt;div className="px-4 sm:px-6 lg:px-8"&gt;
+          &lt;div className="flex justify-between h-16"&gt;
+            &lt;div className="flex"&gt;
+              &lt;button
+                onClick={() =&gt; setIsSidebarOpen(!isSidebarOpen)}
+                className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:hidden"
+              &gt;
+                &lt;Menu className="h-6 w-6" /&gt;
+              &lt;/button&gt;
+              &lt;div className="flex-shrink-0 flex items-center"&gt;
+                &lt;div className="h-8 w-8 bg-blue-600 rounded-md"&gt;&lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+            
+            &lt;div className="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end space-x-4"&gt;
+              &lt;div className="max-w-lg w-full lg:max-w-xs"&gt;
+                &lt;label htmlFor="search" className="sr-only"&gt;Search&lt;/label&gt;
+                &lt;div className="relative"&gt;
+                  &lt;div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"&gt;
+                    &lt;Search className="h-5 w-5 text-gray-400" /&gt;
+                  &lt;/div&gt;
+                  &lt;input
+                    id="search"
+                    name="search"
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Search..."
+                    type="search"
+                  /&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+
+              &lt;div&gt;
+                &lt;label className="text-sm text-gray-700 mr-2"&gt;Select Client:&lt;/label&gt;
+                &lt;select
+                  className="text-sm border-gray-300 rounded-md"
+                  value={selectedClientId || ''}
+                  onChange={(e) =&gt; {
+                    const value = e.target.value;
+                    console.log('Selected client:', value);
+                    setSelectedClientId(value === '' ? null : Number(value));
+                  }}
+                &gt;
+                  &lt;option value=""&gt;All Clients&lt;/option&gt;
+                  {clients &amp;&amp; clients.map(client =&gt; (
+                    &lt;option key={client.id} value={client.id}&gt;
+                      {client.name}
+                    &lt;/option&gt;
+                  ))}
+                &lt;/select&gt;
+              &lt;/div&gt;
+
+              &lt;button className="ml-2 p-2 text-gray-400 hover:text-gray-500 relative"&gt;
+                &lt;Bell className="h-6 w-6" /&gt;
+                &lt;span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" /&gt;
+              &lt;/button&gt;
+
+              &lt;div className="ml-2 relative"&gt;
+                &lt;button className="flex items-center max-w-xs bg-white rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"&gt;
+                  &lt;User className="h-8 w-8 rounded-full text-gray-400" /&gt;
+                &lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/nav&gt;
+
+      {/* Main Layout */}
+      &lt;div className="flex h-screen overflow-hidden"&gt;
+        {/* Sidebar */}
+        &lt;aside className={`${isSidebarOpen ? 'block' : 'hidden'} lg:block lg:flex-shrink-0 bg-white border-r border-gray-200 w-64 overflow-y-auto`}&gt;
+          &lt;nav className="mt-5 px-2 space-y-1"&gt;
+            {navigation.map((item) =&gt; (
+              &lt;div key={item.id}&gt;
+                &lt;button
+                  onClick={() =&gt; handleNavigation(item.id)}
+                  className={`${activeSection === item.id
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  } group w-full flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                &gt;
+                  &lt;item.icon
+                    className={`${activeSection === item.id ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'} mr-3 h-6 w-6`}
+                  /&gt;
+                  {item.name}
+                  {item.subitems &amp;&amp; (
+                    &lt;ChevronDown className="ml-auto h-5 w-5 text-gray-400" /&gt;
+                  )}
+                &lt;/button&gt;
+                {item.subitems &amp;&amp; activeSection === item.id &amp;&amp; (
+                  &lt;div className="mt-1 space-y-1 pl-11"&gt;
+                    {item.subitems.map((subitem) =&gt; (
+                      &lt;button
+                        key={subitem}
+                        onClick={() =&gt; handleNavigation(item.id, subitem)}
+                        className={`${
+                          activeSubitem === subitem
+                            ? 'bg-gray-100 text-gray-900'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        } group w-full flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                      &gt;
+                        {subitem}
+                      &lt;/button&gt;
+                    ))}
+                  &lt;/div&gt;
+                )}
+              &lt;/div&gt;
+            ))}
+          &lt;/nav&gt;
+        &lt;/aside&gt;
+
+        {/* Main Content */}
+        &lt;main className="flex-1 relative z-0 overflow-y-auto focus:outline-none"&gt;
+          &lt;div className="py-6"&gt;
+            &lt;div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8"&gt;
+              &lt;h1 className="text-2xl font-semibold text-gray-900"&gt;
+                {navigation.find(item =&gt; item.id === activeSection)?.name || 'Dashboard'}
+              &lt;/h1&gt;
+            &lt;/div&gt;
+            &lt;div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8"&gt;
+              &lt;div className="py-4"&gt;
+                {renderContent()}
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/main&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+</file>
+<file name="frontend/src/app/api/clients/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  try {
+    const clients = await queryDB(`
+      SELECT client_id, first_name, last_name, email, age, primary_issue 
+      FROM clients
+      ORDER BY last_name, first_name
+    `);
+    return NextResponse.json({ clients });
+  } catch (error: any) {
+    console.error('Error fetching clients:', error);
+    return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/progress/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  // Assume we have a progress_metrics table with columns: client_id, month_label, gad7_score
+  try {
+    const progress = await queryDB(`
+      SELECT client_id, month_label as month, gad7_score
+      FROM progress_metrics
+      ORDER BY client_id, month_label
+    `);
+    return NextResponse.json({ progress });
+  } catch (error: any) {
+    console.error('Error fetching progress data:', error);
+    return NextResponse.json({ error: 'Failed to fetch progress data' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/resources/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  try {
+    const resources = await queryDB(`
+      SELECT client_id, type, link, recommended_by
+      FROM resources
+      ORDER BY client_id
+    `);
+    return NextResponse.json({ resources });
+  } catch (error: any) {
+    console.error('Error fetching resources:', error);
+    return NextResponse.json({ error: 'Failed to fetch resources' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/diagnoses/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  try {
+    const diagnoses = await queryDB(`
+      SELECT client_id, code, description, confidence 
+      FROM diagnoses
+      ORDER BY client_id
+    `);
+    return NextResponse.json({ diagnoses });
+  } catch (error: any) {
+    console.error('Error fetching diagnoses:', error);
+    return NextResponse.json({ error: 'Failed to fetch diagnoses' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/sessions/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  // We return sessions along with client name, therapist name and some session details
+  try {
+    const sessions = await queryDB(`
+      SELECT 
+        s.session_id,
+        s.session_date,
+        c.first_name || ' ' || c.last_name as client_name,
+        t.first_name || ' ' || t.last_name as therapist_name,
+        s.modality,
+        s.location_info,
+        s.presenting_problem,
+        (SELECT LEFT(tr.transcript_text,100) FROM transcripts tr WHERE tr.session_id=s.session_id LIMIT 1) as transcript_preview,
+        s.status
+      FROM sessions s
+      JOIN clients c ON s.client_id = c.client_id
+      JOIN therapists t ON s.therapist_id = t.therapist_id
+      ORDER BY s.session_date, s.session_id
+    `);
+    return NextResponse.json({ sessions });
+  } catch (error: any) {
+    console.error('Error fetching sessions:', error);
+    return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/generate/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { spawn } from "child_process";
+import path from "path";
+import { writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
+
+// Force dynamic rendering and prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// Debug messages to filter out
+const DEBUG_MESSAGES = [
+  'Using provided text',
+  'Generating',
+  'Processing',
+  'Converting',
+  'Transcribing',
+  'Audio file saved',
+  'Starting transcription',
+  'Completed transcription',
+  'Extracting text',
+  'Downloading transcript',
+];
+
+export async function POST(req: NextRequest) {
+  try {
+    // Add cache control headers
+    const headers = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
+
+    // Handle FormData
+    const formData = await req.formData();
+    const inputType = formData.get('inputType') as string;
+    const inputText = formData.get('inputText') as string;
+    const formType = formData.get('formType') as string;
+    const audioFile = formData.get('audioFile') as File;
+
+    let audioFilePath: string | undefined;
+
+    // If there's an audio file, save it temporarily
+    if (audioFile &amp;&amp; inputType === 'audio') {
+      const bytes = await audioFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      // Create a unique filename
+      const fileName = `${randomUUID()}-${audioFile.name}`;
+      audioFilePath = path.join(process.cwd(), '..', 'uploads', fileName);
+      
+      // Ensure uploads directory exists
+      await spawn('mkdir', ['-p', path.join(process.cwd(), '..', 'uploads')]);
+      
+      // Write the file
+      await writeFile(audioFilePath, buffer);
+      console.log('Saved audio file to:', audioFilePath);
+    }
+
+    // Get the correct path to app.py (in the root directory)
+    const appPath = path.join(process.cwd(), "..", "app.py");
+    console.log("Python script path:", appPath);
+
+    // Create Python process with correct path
+    const pythonProcess = spawn("python", [
+      appPath,
+      "--input-text", inputText || '',
+      "--form-type", formType,
+      "--input-type", inputType,
+      ...(audioFilePath ? ["--audio-file", audioFilePath] : []),
+    ]);
+
+    let result = "";
+    let error = "";
+
+    // Collect data from Python process
+    pythonProcess.stdout.on("data", (data) =&gt; {
+      const output = data.toString();
+      console.log("Python output:", output);
+      
+      // Only add lines that don't look like debug messages
+      const lines = output.split('\n');
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine &amp;&amp; !DEBUG_MESSAGES.some(msg =&gt; line.includes(msg)) &amp;&amp; 
+            !line.includes('audio file:') &amp;&amp; 
+            !line.includes('.wav') &amp;&amp;
+            !line.includes('.mp3')) {
+          result += trimmedLine + '\n';
+        }
+      }
+    });
+
+    pythonProcess.stderr.on("data", (data) =&gt; {
+      error += data.toString();
+      console.error("Python error:", error);
+    });
+
+    // Wait for Python process to complete
+    const exitCode = await new Promise((resolve) =&gt; {
+      pythonProcess.on("close", resolve);
+    });
+
+    // Clean up the temporary audio file
+    if (audioFilePath) {
+      try {
+        await spawn('rm', [audioFilePath]);
+      } catch (error) {
+        console.error('Error cleaning up audio file:', error);
+      }
+    }
+
+    if (exitCode !== 0) {
+      console.error("Python process failed:", error);
+      return NextResponse.json(
+        { error: "Failed to generate note: " + error },
+        { status: 500, headers }
+      );
+    }
+
+    try {
+      // Try to parse the result as JSON
+      const parsedResult = JSON.parse(result.trim());
+      return NextResponse.json({ note: parsedResult }, { headers });
+    } catch (e) {
+      // If it's not JSON, return the raw result
+      return NextResponse.json({ note: result.trim() }, { headers });
+    }
+  } catch (error: any) {
+    console.error("Error in API route:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to process request" },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    );
+  }
+} 
+</file>
+<file name="frontend/src/app/api/templates/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  // For demonstration, assume we have a templates table or we can hardcode them initially.
+  // If no templates table, we can define a small mock in DB or just return a static set from DB.
+
+  // Let's assume there's a table: note_templates(name, format)
+  // If not created, please add it to your schema and mock_data.
+  try {
+    const templates = await queryDB(`
+      SELECT name, format FROM note_templates
+      ORDER BY name
+    `);
+    return NextResponse.json({ templates });
+  } catch (error: any) {
+    console.error('Error fetching templates:', error);
+    return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/extract/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { spawn } from "child_process";
+import path from "path";
+import { writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
+
+// Force dynamic rendering and prevent caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const DEBUG_MESSAGES = [
+  'Using provided text',
+  'Generating',
+  'Processing',
+  'Converting',
+  'Transcribing',
+  'Audio file saved',
+  'Starting transcription',
+  'Completed transcription',
+  'Extracting text',
+  'Downloading transcript',
+  'Extracting entities'
+];
+
+export async function POST(req: NextRequest) {
+  try {
+    const headers = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
+
+    const formData = await req.formData();
+    const inputType = formData.get('inputType') as string;
+    const inputText = formData.get('inputText') as string;
+    const audioFile = formData.get('audioFile') as File;
+
+    let audioFilePath: string | undefined;
+    if (audioFile &amp;&amp; inputType === 'audio') {
+      const bytes = await audioFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const fileName = `${randomUUID()}-${audioFile.name}`;
+      audioFilePath = path.join(process.cwd(), '..', 'uploads', fileName);
+      
+      await spawn('mkdir', ['-p', path.join(process.cwd(), '..', 'uploads')]);
+      await writeFile(audioFilePath, buffer);
+      console.log('Saved audio file to:', audioFilePath);
+    }
+
+    const appPath = path.join(process.cwd(), "..", "app.py");
+    console.log("Python script path:", appPath);
+
+    const pythonProcess = spawn("python", [
+      appPath,
+      "--mode", "entities",
+      "--input-text", inputText || '',
+      "--input-type", inputType,
+      ...(audioFilePath ? ["--audio-file", audioFilePath] : []),
+    ]);
+
+    let result = "";
+    let error = "";
+
+    pythonProcess.stdout.on("data", (data) =&gt; {
+      const output = data.toString();
+      console.log("Python output:", output);
+      
+      const lines = output.split('\n');
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (
+          trimmedLine &amp;&amp;
+          !DEBUG_MESSAGES.some(msg =&gt; line.includes(msg)) &amp;&amp;
+          !line.includes('audio file:') &amp;&amp;
+          !line.includes('.wav') &amp;&amp;
+          !line.includes('.mp3')
+        ) {
+          result += trimmedLine + '\n';
+        }
+      }
+    });
+
+    pythonProcess.stderr.on("data", (data) =&gt; {
+      error += data.toString();
+      console.error("Python error:", error);
+    });
+
+    const exitCode = await new Promise((resolve) =&gt; {
+      pythonProcess.on("close", resolve);
+    });
+
+    if (audioFilePath) {
+      try {
+        await spawn('rm', [audioFilePath]);
+      } catch (error) {
+        console.error('Error cleaning up audio file:', error);
+      }
+    }
+
+    if (exitCode !== 0) {
+      console.error("Python process failed:", error);
+      return NextResponse.json(
+        { error: "Failed to extract entities: " + error },
+        { status: 500, headers }
+      );
+    }
+
+    try {
+      const parsedResult = JSON.parse(result.trim());
+      return NextResponse.json({ entities: parsedResult }, { headers });
+    } catch (e) {
+      return NextResponse.json({ entities: result.trim() }, { headers });
+    }
+
+  } catch (error: any) {
+    console.error("Error in API route:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to process request" },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    );
+  }
+}
+
+</file>
+<file name="frontend/src/app/api/billing/route.ts">
+import { NextRequest, NextResponse } from 'next/server';
+import { queryDB } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(req: NextRequest) {
+  // Billing entries linked to sessions
+  try {
+    const billing = await queryDB(`
+      SELECT session_id, cpt_code, amount, status
+      FROM billing_entries
+      ORDER BY session_id
+    `);
+    return NextResponse.json({ billing });
+  } catch (error: any) {
+    console.error('Error fetching billing entries:', error);
+    return NextResponse.json({ error: 'Failed to fetch billing entries' }, { status: 500 });
+  }
+}
+
+</file>
+<file name="frontend/src/components/NoteForm.tsx">
+import React, { useState, useRef, useEffect } from 'react';
+import { FileText, Youtube, Mic, Upload, BookOpen } from 'lucide-react';
+
+interface NoteFormProps {
+  onGenerate: (data: {
+    inputType: string;
+    inputText: string;
+    formType: string;
+    audioFile?: File;
+  }) =&gt; Promise&lt;void&gt;;
+  isLoading: boolean;
+}
+
+interface ExampleInput {
+  label: string;
+  inputType: 'text' | 'youtube' | 'audio';
+  formType: string;
+  description: string;
+  content?: string;
+  audioFileName?: string;
+}
+
+// Example inputs structure (content will be loaded dynamically)
+const EXAMPLE_INPUTS: ExampleInput[] = [
+  {
+    label: "Sample Therapy Session",
+    inputType: "text",
+    formType: "SOAP",
+    description: "Detailed therapy session transcript with observations",
+    content: "", // Will be loaded dynamically
+  },
+  {
+    label: "CBT Role-Play Session 1",
+    inputType: "youtube",
+    formType: "DAP",
+    description: "Complete CBT session focusing on self-confidence",
+    content: "https://www.youtube.com/watch?v=KuHLL2AE-SE",
+  },
+  {
+    label: "CBT Role-Play Session 2",
+    inputType: "youtube",
+    formType: "SOAPIER",
+    description: "Follow-up CBT session on workplace confidence",
+    content: "https://www.youtube.com/watch?v=jS1KE3_Pqlc",
+  },
+  {
+    label: "CBT Role-Play Audio",
+    inputType: "audio",
+    formType: "BIRP",
+    description: "Audio recording of a CBT session",
+    audioFileName: "CBTRolePlay.mp3",
+  },
+] as const;
+
+export function NoteForm({ onGenerate, isLoading }: NoteFormProps) {
+  const [inputType, setInputType] = useState&lt;'text' | 'youtube' | 'audio'&gt;('text');
+  const [inputText, setInputText] = useState('');
+  const [formType, setFormType] = useState('SOAP');
+  const [audioFile, setAudioFile] = useState&lt;File | null&gt;(null);
+  const fileInputRef = useRef&lt;HTMLInputElement&gt;(null);
+  const [showExamples, setShowExamples] = useState(false);
+  const [examples, setExamples] = useState(EXAMPLE_INPUTS);
+
+  // Load sample text content when component mounts
+  useEffect(() =&gt; {
+    const loadSampleContent = async () =&gt; {
+      try {
+        const response = await fetch('/data/sample_note.txt');
+        const content = await response.text();
+        
+        // Update the first example with the loaded content
+        setExamples(prev =&gt; prev.map((example, index) =&gt; 
+          index === 0 ? { ...example, content } : example
+        ));
+      } catch (error) {
+        console.error('Error loading sample note:', error);
+      }
+    };
+
+    loadSampleContent();
+  }, []);
+
+  const noteFormats = [
+    { value: "SOAP", label: "SOAP" },
+    { value: "DAP", label: "DAP" },
+    { value: "BIRP", label: "BIRP" },
+    { value: "PIRP", label: "PIRP" },
+    { value: "GIRP", label: "GIRP" },
+    { value: "SIRP", label: "SIRP" },
+    { value: "FAIR/F-DARP", label: "FAIR/F-DARP" },
+    { value: "DARE", label: "DARE" },
+    { value: "PIE", label: "PIE" },
+    { value: "SOAPIER", label: "SOAPIER" },
+    { value: "SOAPIE", label: "SOAPIE" },
+    { value: "POMR", label: "POMR" },
+    { value: "Narrative", label: "Narrative" },
+    { value: "CBE", label: "CBE" },
+    { value: "SBAR", label: "SBAR" },
+  ];
+
+  const inputTypes = [
+    { id: 'text', icon: FileText, label: 'Text' },
+    { id: 'youtube', icon: Youtube, label: 'YouTube' },
+    { id: 'audio', icon: Mic, label: 'Audio' },
+  ];
+
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
+    e.preventDefault();
+    
+    // Create FormData and append all fields
+    const formData = new FormData();
+    formData.append('inputType', inputType);
+    formData.append('inputText', inputText);
+    formData.append('formType', formType);
+    if (audioFile &amp;&amp; inputType === 'audio') {
+      formData.append('audioFile', audioFile);
+    }
+
+    await onGenerate({
+      inputType,
+      inputText,
+      formType,
+      audioFile: audioFile || undefined,
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size &gt; 10 * 1024 * 1024) { // 10MB limit
+        alert('File size must be less than 10MB');
+        return;
+      }
+      if (!file.type.startsWith('audio/')) {
+        alert('Please upload an audio file (MP3, WAV, or M4A)');
+        return;
+      }
+      setAudioFile(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent&lt;HTMLDivElement&gt;) =&gt; {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.size &gt; 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      if (!file.type.startsWith('audio/')) {
+        alert('Please upload an audio file (MP3, WAV, or M4A)');
+        return;
+      }
+      setAudioFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent&lt;HTMLDivElement&gt;) =&gt; {
+    e.preventDefault();
+  };
+
+  const handleExampleClick = async (example: ExampleInput) =&gt; {
+    setInputType(example.inputType);
+    setFormType(example.formType);
+    
+    if (example.inputType === 'audio' &amp;&amp; example.audioFileName) {
+      try {
+        const response = await fetch(`/data/${example.audioFileName}`);
+        const blob = await response.blob();
+        const file = new File([blob], example.audioFileName, { type: 'audio/mp3' });
+        setAudioFile(file);
+      } catch (error) {
+        console.error('Error loading audio file:', error);
+      }
+    } else if (example.content) {
+      setInputText(example.content);
+    }
+    setShowExamples(false);
+  };
+
+  return (
+    &lt;form onSubmit={handleSubmit} className="space-y-6"&gt;
+      {/* Examples Button */}
+      &lt;div className="flex justify-end"&gt;
+        &lt;button
+          type="button"
+          onClick={() =&gt; setShowExamples(!showExamples)}
+          className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+        &gt;
+          &lt;BookOpen className="w-4 h-4" /&gt;
+          {showExamples ? 'Hide Examples' : 'Show Examples'}
+        &lt;/button&gt;
+      &lt;/div&gt;
+
+      {/* Examples Panel */}
+      {showExamples &amp;&amp; (
+        &lt;div className="bg-blue-50 rounded-lg p-4 space-y-4"&gt;
+          &lt;h3 className="font-medium text-blue-900"&gt;Example Inputs&lt;/h3&gt;
+          &lt;div className="grid gap-3"&gt;
+            {examples.map((example, index) =&gt; (
+              &lt;button
+                key={index}
+                type="button"
+                onClick={() =&gt; handleExampleClick(example)}
+                className="text-left bg-white p-3 rounded-md shadow-sm hover:shadow-md
+                  border border-blue-100 transition-all duration-200"
+              &gt;
+                &lt;div className="flex items-start justify-between"&gt;
+                  &lt;div&gt;
+                    &lt;h4 className="font-medium text-gray-900"&gt;{example.label}&lt;/h4&gt;
+                    &lt;p className="text-sm text-gray-500 mt-1"&gt;{example.description}&lt;/p&gt;
+                  &lt;/div&gt;
+                  &lt;span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded"&gt;
+                    {example.formType}
+                  &lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/button&gt;
+            ))}
+          &lt;/div&gt;
+        &lt;/div&gt;
+      )}
+
+      {/* Input Type */}
+      &lt;div&gt;
+        &lt;label className="block font-medium text-gray-700 mb-3"&gt;Input Type&lt;/label&gt;
+        &lt;div className="grid grid-cols-3 gap-3"&gt;
+          {inputTypes.map(({ id, icon: Icon, label }) =&gt; (
+            &lt;button
+              key={id}
+              type="button"
+              onClick={() =&gt; setInputType(id as typeof inputType)}
+              className={`
+                flex items-center justify-center gap-2 py-3 px-4 rounded-lg
+                transition-all duration-200 relative overflow-hidden
+                ${inputType === id 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'bg-white text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200'
+                }
+              `}
+            &gt;
+              &lt;Icon className={`w-5 h-5 ${inputType === id ? 'text-white' : 'text-blue-600'}`} /&gt;
+              &lt;span className={`font-medium ${inputType === id ? 'text-white' : 'text-gray-700'}`}&gt;
+                {label}
+              &lt;/span&gt;
+            &lt;/button&gt;
+          ))}
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      {/* Text Input Area */}
+      {inputType !== 'audio' &amp;&amp; (
+        &lt;div&gt;
+          &lt;label className="block font-medium text-gray-700 mb-2"&gt;
+            {inputType === 'youtube' ? 'YouTube URL' : 'Transcript'}
+          &lt;/label&gt;
+          &lt;textarea
+            value={inputText}
+            onChange={(e) =&gt; setInputText(e.target.value)}
+            className="w-full h-48 rounded-lg border-gray-200 shadow-sm
+              focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+              bg-white text-gray-900 resize-none p-4"
+            placeholder={inputType === 'youtube' 
+              ? 'Enter YouTube URL...' 
+              : 'Paste or type your session transcript here...'
+            }
+          /&gt;
+        &lt;/div&gt;
+      )}
+
+      {/* Audio Upload Zone */}
+      {inputType === 'audio' &amp;&amp; (
+        &lt;div&gt;
+          &lt;label className="block font-medium text-gray-700 mb-2"&gt;
+            Audio File
+          &lt;/label&gt;
+          &lt;div
+            onClick={() =&gt; fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8
+              hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer
+              group"
+          &gt;
+            &lt;input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleFileChange}
+              className="hidden"
+            /&gt;
+            &lt;div className="flex flex-col items-center space-y-4"&gt;
+              {audioFile ? (
+                &lt;&gt;
+                  &lt;Upload className="w-12 h-12 text-blue-500" /&gt;
+                  &lt;div className="text-center"&gt;
+                    &lt;span className="text-blue-600 font-medium"&gt;{audioFile.name}&lt;/span&gt;
+                    &lt;p className="text-sm text-gray-500 mt-1"&gt;
+                      Click to change file
+                    &lt;/p&gt;
+                  &lt;/div&gt;
+                &lt;/&gt;
+              ) : (
+                &lt;&gt;
+                  &lt;Upload className="w-12 h-12 text-gray-400 group-hover:text-blue-500 transition-colors" /&gt;
+                  &lt;div className="text-center"&gt;
+                    &lt;p className="text-sm text-gray-600"&gt;
+                      &lt;span className="text-blue-600 font-medium"&gt;Click to upload&lt;/span&gt;
+                      {' '}or drag and drop
+                    &lt;/p&gt;
+                    &lt;p className="text-xs text-gray-500 mt-1"&gt;
+                      MP3, WAV, or M4A (max 10MB)
+                    &lt;/p&gt;
+                  &lt;/div&gt;
+                &lt;/&gt;
+              )}
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      )}
+
+      {/* Note Format */}
+      &lt;div&gt;
+        &lt;label className="block font-medium text-gray-700 mb-2"&gt;
+          Note Format
+        &lt;/label&gt;
+        &lt;select 
+          value={formType}
+          onChange={(e) =&gt; setFormType(e.target.value)}
+          className="w-full rounded-lg border-gray-200 shadow-sm
+            focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+            bg-white text-gray-900 py-2.5 px-4"
+        &gt;
+          {noteFormats.map(format =&gt; (
+            &lt;option key={format.value} value={format.value}&gt;
+              {format.label}
+            &lt;/option&gt;
+          ))}
+        &lt;/select&gt;
+      &lt;/div&gt;
+
+      &lt;button
+        type="submit"
+        disabled={isLoading}
+        className={`
+          w-full py-3 px-4 rounded-lg font-medium shadow-sm
+          transition-colors duration-200
+          ${isLoading 
+            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-200'
+          }
+        `}
+      &gt;
+        {isLoading ? (
+          &lt;div className="flex items-center justify-center gap-2"&gt;
+            &lt;svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"&gt;
+              &lt;circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"&gt;&lt;/circle&gt;
+              &lt;path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"&gt;&lt;/path&gt;
+            &lt;/svg&gt;
+            &lt;span&gt;Generating...&lt;/span&gt;
+          &lt;/div&gt;
+        ) : (
+          'Generate Note'
+        )}
+      &lt;/button&gt;
+    &lt;/form&gt;
+  );
+}
+</file>
+<file name="frontend/src/components/NoteResult.tsx">
+"use client";
+
+import { useState } from "react";
+import { Check, Copy } from 'lucide-react';
+
+interface NoteResultProps {
+  note: string | null;
+  isLoading: boolean;
+}
+
+export function NoteResult({ note, isLoading }: NoteResultProps) {
+  const [copied, setCopied] = useState(false);
+
+  if (isLoading) {
+    return (
+      &lt;div className="space-y-3"&gt;
+        &lt;div className="h-3 bg-blue-100/50 rounded-full w-3/4"&gt;&lt;/div&gt;
+        &lt;div className="h-3 bg-blue-100/50 rounded-full"&gt;&lt;/div&gt;
+        &lt;div className="h-3 bg-blue-100/50 rounded-full w-5/6"&gt;&lt;/div&gt;
+        &lt;div className="h-3 bg-blue-100/50 rounded-full w-2/3"&gt;&lt;/div&gt;
+        &lt;div className="space-y-2 mt-6"&gt;
+          &lt;div className="h-2 bg-blue-50/50 rounded-full"&gt;&lt;/div&gt;
+          &lt;div className="h-2 bg-blue-50/50 rounded-full w-5/6"&gt;&lt;/div&gt;
+          &lt;div className="h-2 bg-blue-50/50 rounded-full"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    );
+  }
+
+  if (!note) {
+    return (
+      &lt;div className="text-center py-12"&gt;
+        &lt;div className="w-12 h-12 mx-auto mb-4 rounded-full bg-blue-100/50 flex items-center justify-center"&gt;
+          &lt;svg
+            className="w-6 h-6 text-blue-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          &gt;
+            &lt;path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            /&gt;
+          &lt;/svg&gt;
+        &lt;/div&gt;
+        &lt;h3 className="text-sm font-medium text-gray-900"&gt;No note generated&lt;/h3&gt;
+        &lt;p className="mt-1 text-sm text-gray-500"&gt;
+          Fill out the form and click Generate to create a note
+        &lt;/p&gt;
+      &lt;/div&gt;
+    );
+  }
+
+  const handleCopy = async () =&gt; {
+    await navigator.clipboard.writeText(note);
+    setCopied(true);
+    setTimeout(() =&gt; setCopied(false), 2000);
+  };
+
+  return (
+    &lt;div className="relative"&gt;
+      &lt;div className="absolute right-2 top-2 z-10"&gt;
+        &lt;button
+          onClick={handleCopy}
+          className={`
+            inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md
+            transition-all duration-200
+            ${copied
+              ? 'bg-green-100 text-green-700'
+              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }
+          `}
+        &gt;
+          {copied ? (
+            &lt;&gt;
+              &lt;Check className="w-3.5 h-3.5" /&gt;
+              &lt;span&gt;Copied!&lt;/span&gt;
+            &lt;/&gt;
+          ) : (
+            &lt;&gt;
+              &lt;Copy className="w-3.5 h-3.5" /&gt;
+              &lt;span&gt;Copy&lt;/span&gt;
+            &lt;/&gt;
+          )}
+        &lt;/button&gt;
+      &lt;/div&gt;
+
+      &lt;div className="rounded-lg bg-gray-50 border border-gray-200"&gt;
+        &lt;pre className="p-4 text-sm leading-relaxed text-gray-800 font-mono overflow-x-auto"&gt;
+          {note}
+        &lt;/pre&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+</file>
+<file name="frontend/src/lib/db.ts">
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
+
+export async function queryDB(query: string, values: any[] = []) {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(query, values);
+    return res.rows;
+  } finally {
+    client.release();
+  }
+}
+
+</file>
+<file name="frontend/src/lib/note-generator.ts">
+import { spawn } from "child_process";
+import path from "path";
+
+export async function process_input(
+  input_text: string,
+  form_type: string,
+  input_type: string = "text",
+  audio_file?: File,
+  force_refresh: boolean = false
+): Promise&lt;string&gt; {
+  return new Promise((resolve, reject) =&gt; {
+    const pythonProcess = spawn("python", [
+      path.join(process.cwd(), "main.py"),
+      "--input-text",
+      input_text,
+      "--form-type",
+      form_type,
+      "--input-type",
+      input_type,
+      ...(audio_file ? ["--audio-file", audio_file.name] : []),
+      ...(force_refresh ? ["--force-refresh"] : []),
+    ]);
+
+    let result = "";
+    let error = "";
+
+    pythonProcess.stdout.on("data", (data) =&gt; {
+      result += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) =&gt; {
+      error += data.toString();
+    });
+
+    pythonProcess.on("close", (code) =&gt; {
+      if (code === 0) {
+        resolve(result.trim());
+      } else {
+        reject(new Error(error || "Failed to generate note"));
+      }
+    });
+  });
+} 
+</file>
+<file name="config/auth.py">
+from __future__ import annotations
+import os
+from pathlib import Path
+import yaml
+from typing import Dict
+
+
+def load_auth_credentials() -&gt; Dict[str, str]:
+    """Load authentication credentials from YAML file."""
+    auth_file = Path("config/credentials.yaml")
+
+    if not auth_file.exists():
+        # Create default credentials file if it doesn't exist
+        default_auth = {
+            "credentials": {
+                "admin": os.environ.get("ADMIN_PASSWORD", "change_this_password"),
+            }
+        }
+        auth_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(auth_file, "w") as f:
+            yaml.dump(default_auth, f)
+
+    with open(auth_file, "r") as f:
+        auth_data = yaml.safe_load(f)
+
+    return auth_data.get("credentials", {})
+
+</file>
+<file name="config/logging_config.py">
+from __future__ import annotations
+import logging
+import sys
+from pathlib import Path
+
+
+def setup_logging(log_level: str = "INFO") -&gt; None:
+    """
+    Set up logging configuration for the application.
+
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    """
+    # Create logs directory if it doesn't exist
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(log_dir / "app.log"),
+        ],
+    )
+
+    # Create logger
+    logger = logging.getLogger("therapy_notes")
+
+    # Log startup message
+    logger.info("Logging initialized at %s level", log_level)
+
+</file>
+<file name="config/__init__.py">
+# Package initialization
+
+</file>
+<file name="config/credentials.yaml">
+credentials:
+  admin: hldfhjld075
+  pxp: testpasspxp 
+</file>
+<file name="config/settings.py">
+from __future__ import annotations
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+
+class Settings:
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+    LANGCHAIN_API_KEY = os.environ.get("LANGCHAIN_API_KEY", "")
+    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+    DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
+
+    # Provider can be "openai" or "google_gemini"
+    MODEL_PROVIDER = os.environ.get("MODEL_PROVIDER", "openai")  # "openai"
+
+    # Default model names
+    OPENAI_MODEL_NAME = "gpt-4o-mini"
+    GEMINI_MODEL_NAME = "gemini-2.0-flash-exp"
+
+
+settings = Settings()
+
+</file>
+<file name="tests/test_extraction.py">
+import pytest
+from pathlib import Path
+from app import process_entities
+from forms.entities import EntitiesExtractionResult
+import yaml
+
+@pytest.mark.parametrize("input_file", ["data/sample_note.txt"])
+def test_process_entities_from_text(input_file):
+    # Read sample transcript
+    input_path = Path(input_file)
+    assert input_path.exists(), f"Input file {input_file} not found."
+    transcript = input_path.read_text()
+
+    # Call the process_entities function directly
+    result = process_entities(transcript, input_type="text", audio_file=None)
+    
+    # Parse YAML result
+    parsed_result = yaml.safe_load(result)
+    
+    # Check for no error in result
+    assert "error" not in parsed_result, f"Unexpected error in result: {parsed_result.get('error')}"
+
+    # Validate structure against EntitiesExtractionResult schema
+    # We can try to instantiate EntitiesExtractionResult to ensure correctness
+    extraction = EntitiesExtractionResult(**parsed_result)
+
+    # Basic sanity checks: 
+    # The result should have a 'Summary' key (maybe None if not found)
+    # Just check that we can instantiate successfully and no exceptions are raised.
+    # Optionally, we can make some assertions about expected fields.
+    # For now, let's just ensure that the schema validation passes.
+    assert isinstance(extraction, EntitiesExtractionResult)
+
+    # You can add more specific assertions if desired
+    # For example:
+    # assert extraction.emotion is None or isinstance(extraction.emotion, list)
+    # assert extraction.goal is None or isinstance(extraction.goal, list)
+    # etc.
+
+    # If you want to confirm certain text leads to certain entities, add those assertions here.
+    # For a generic test, we just confirm no exceptions and schema validation.
+
+</file>
+<file name="tests/__init__.py">
+
+</file>
+<file name="utils/transcription.py">
+from __future__ import annotations
+from pathlib import Path
+import httpx
+from deepgram import (
+    DeepgramClient,
+    DeepgramClientOptions,
+    PrerecordedOptions,
+    FileSource,
+)
+from config.settings import settings
+
+
+class TranscriptionService:
+    def __init__(self):
+        if not settings.DEEPGRAM_API_KEY:
+            raise ValueError("DEEPGRAM_API_KEY is not set in environment variables")
+
+        # Initialize Deepgram client with options
+        config = DeepgramClientOptions(
+            verbose=False,  # Set to True for debugging
+        )
+        self.client = DeepgramClient(settings.DEEPGRAM_API_KEY, config)
+
+    def transcribe_file(self, audio_path: str | Path) -&gt; str:
+        """
+        Transcribe an audio file using Deepgram.
+
+        Args:
+            audio_path: Path to the audio file
+
+        Returns:
+            Transcribed text with proper formatting
+        """
+        try:
+            print(f"Transcribing audio file: {audio_path}")
+
+            # Read file into buffer
+            with open(audio_path, "rb") as file:
+                buffer_data = file.read()
+
+            # Create payload
+            payload: FileSource = {
+                "buffer": buffer_data,
+            }
+
+            # Configure transcription options
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                language="en-US",
+                utterances=True,
+                punctuate=True,
+                diarize=True,
+            )
+
+            # Transcribe with timeout
+            response = self.client.listen.rest.v("1").transcribe_file(
+                payload, options, timeout=httpx.Timeout(300.0, connect=10.0)
+            )
+
+            # Extract the transcript from the response
+            transcript = response.results.channels[0].alternatives[0].transcript
+
+            return transcript.strip()
+
+        except Exception as e:
+            raise Exception(f"Error transcribing with Deepgram: {str(e)}")
+
+</file>
+<file name="utils/youtube.py">
+from __future__ import annotations
+from youtube_transcript_api import YouTubeTranscriptApi
+from urllib.parse import urlparse, parse_qs
+
+
+def extract_youtube_video_id(url: str) -&gt; str:
+    """Extract the video_id from a YouTube URL."""
+    parsed = urlparse(url)
+    if parsed.hostname in ("www.youtube.com", "youtube.com"):
+        return parse_qs(parsed.query)["v"][0]
+    elif parsed.hostname == "youtu.be":
+        return parsed.path.lstrip("/")
+    raise ValueError("Invalid YouTube URL")
+
+
+def download_transcript(url: str) -&gt; str:
+    """Download the YouTube transcript as a string."""
+    video_id = extract_youtube_video_id(url)
+    print(f"Downloading transcript for video ID: {video_id}")
+    transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+    full_text = " ".join([item["text"] for item in transcript_list])
+    return full_text
+
+</file>
+<file name="utils/text_processing.py">
+from __future__ import annotations
+
+
+def chunk_text(text: str, chunk_size: int = 3000) -&gt; list[str]:
+    """
+    Simple utility to chunk text into manageable pieces if needed
+    for long transcripts.
+    """
+    words = text.split()
+    chunks = []
+    for i in range(0, len(words), chunk_size):
+        chunks.append(" ".join(words[i : i + chunk_size]))
+    return chunks
+
+</file>
+<file name="utils/cache.py">
+from __future__ import annotations
+import json
+import os
+import psycopg2
+from datetime import datetime
+
+# This updated cache uses a PostgreSQL database. Ensure DATABASE_URL is set.
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/theranote_db")
+
+class CacheManager:
+    def __init__(self):
+        self.conn = psycopg2.connect(**self._get_db_params())
+        self._init_db()
+
+    def _get_db_params(self):
+        db_params = {
+            'dbname': os.getenv('DB_NAME'),
+            'user': os.getenv('DB_USER'),
+            'password': os.getenv('DB_PASSWORD'),
+            'host': os.getenv('DB_HOST'),
+            'port': os.getenv('DB_PORT')
+        }
+        return db_params
+
+    def _init_db(self):
+        with self.conn:
+            with self.conn.cursor() as cur:
+                # We'll store cached extractions in a separate table
+                # If not existing, create it.
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS extraction_cache (
+                    input_hash TEXT,
+                    form_type TEXT,
+                    result TEXT,
+                    model_name TEXT,
+                    timestamp TIMESTAMP,
+                    PRIMARY KEY (input_hash, form_type, model_name)
+                );
+                """)
+
+                # We'll also store transcripts if needed
+                # Already transcripts table exists, but we can also store raw cache if needed
+                # For now, rely on main transcripts table.
+
+    def _hash_content(self, content: str) -&gt; str:
+        # Just a stable hash. Alternatively, could import hashlib.
+        import hashlib
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def get_extraction(self, input_content: str, form_type: str, model_name: str) -&gt; dict | None:
+        input_hash = self._hash_content(input_content)
+        with self.conn:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                SELECT result FROM extraction_cache
+                WHERE input_hash=%s AND form_type=%s AND model_name=%s
+                """, (input_hash, form_type, model_name))
+                row = cur.fetchone()
+                if row:
+                    return json.loads(row[0])
+        return None
+
+    def store_extraction(self, input_content: str, form_type: str, result: dict, model_name: str):
+        input_hash = self._hash_content(input_content)
+        with self.conn:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                INSERT INTO extraction_cache (input_hash, form_type, result, model_name, timestamp)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (input_hash, form_type, model_name) DO UPDATE SET
+                result=excluded.result,
+                timestamp=excluded.timestamp
+                """, (input_hash, form_type, json.dumps(result), model_name, datetime.now()))
+
+    def close(self):
+        self.conn.close()
+</file>
+<file name="utils/__init__.py">
+# Package initialization
+
+</file>
+<file name="utils/audio.py">
+from __future__ import annotations
+from pathlib import Path
+from pydub import AudioSegment
+from utils.transcription import TranscriptionService
+
+# Initialize the transcription service
+transcription_service = TranscriptionService()
+
+
+def convert_audio_to_wav(audio_path: str | Path) -&gt; str:
+    """Convert uploaded audio to WAV format if needed."""
+    audio_path = Path(audio_path)
+    output_path = audio_path.with_suffix(".wav")
+
+    if audio_path.suffix.lower() != ".wav":
+        print(f"Converting {audio_path.name} to WAV format...")
+        audio = AudioSegment.from_file(audio_path)
+        audio.export(output_path, format="wav")
+        return str(output_path)
+
+    return str(audio_path)
+
+
+def transcribe_audio(audio_path: str | Path) -&gt; str:
+    """
+    Transcribe audio using Deepgram.
+    Supports multiple audio formats, converts to WAV if needed.
+    """
+    try:
+        # Convert to WAV if needed
+        wav_path = convert_audio_to_wav(audio_path)
+
+        # Transcribe using Deepgram
+        transcript = transcription_service.transcribe_file(wav_path)
+
+        return transcript
+
+    except Exception as e:
+        raise Exception(f"Error transcribing audio: {str(e)}")
+
+</file>
+<file name="models/__init__.py">
+# Package initialization
+
+</file>
+<file name="models/llm_provider.py">
+from __future__ import annotations
+from config.settings import settings
+from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+def get_model_identifier(llm) -&gt; str:
+    """Get a unique identifier for the model."""
+    if isinstance(llm, ChatOpenAI):
+        return f"openai-{llm.model_name}"
+    elif isinstance(llm, ChatGoogleGenerativeAI):
+        return f"gemini-{settings.GEMINI_MODEL_NAME}"
+    else:
+        return "unknown-model"
+
+
+def get_llm(model_name: str | None = None):
+    """
+    Return an LLM instance based on the configured provider.
+    """
+    provider = settings.MODEL_PROVIDER
+
+    if provider == "openai":
+        model_name = model_name or settings.OPENAI_MODEL_NAME
+        if not settings.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is not set")
+        llm = ChatOpenAI(
+            model=model_name,
+            openai_api_key=settings.OPENAI_API_KEY,
+            temperature=0,
+        )
+    elif provider == "google_gemini":
+        model_name = model_name or settings.GEMINI_MODEL_NAME
+        if not settings.GOOGLE_API_KEY:
+            raise ValueError("GOOGLE_API_KEY is not set")
+        llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            temperature=0,
+            max_tokens=None,
+            max_retries=2,
+        )
+    else:
+        raise ValueError(f"Unknown model provider: {provider}")
+
+    return llm
+
+</file>
+<file name="langhub/__init__.py">
+# Package initialization
+
+</file>
+<file name="langhub/prompts/entities_extraction_prompt.yaml">
+entities_extraction_prompt:
+  system: |
+    You are a clinical assistant specialized in extracting structured information from therapy session notes. Given a therapy session transcript or summary, identify and list the following:
+
+    - Summary
+    - Emotions (emotion)
+    - Goals (goal)
+    - Interventions (intervention)
+    - Diagnoses (diagnosis)
+    - Topics (topic)
+    - Resources (resource)
+    - Homework Assignments (homework)
+    - Events/Incidents (event)
+    - Sentiments (sentiment)
+    - Patterns/Themes (pattern)
+    - Progress Indicators (progress_metric)
+    - Treatment Plans (treatment_plan)
+    - Assessment Tools (assessment_tool)
+    - Session Outcomes (outcome)
+    - Client Concerns (concern)
+    - Therapist Notes (note)
+    - Support Systems (support_system)
+    - Behaviors (behavior)
+    - Cognitive Distortions (cognitive_distortion)
+    - Physical Symptoms (physical_symptom)
+    - Relational Dynamics (relational_dynamic)
+    - Motivational Factors (motivation)
+    - Self-Perception (self_perception)
+    - Coping Strategies (coping_strategy)
+    - Barriers to Progress (barrier)
+
+    For each category, extract zero or more entities. Each entity should have a name, and optionally details. 
+    If no entities for a category, return null for that category.
+
+    Return data in the structured schema provided.
+  human: |
+    Extract the data from the following transcript:
+
+    {text}
+
+</file>
+<file name="langhub/prompts/therapy_extraction_prompt.yaml">
+prompts:
+  soap:
+    system: |
+      You are an expert therapist assistant. Extract a SOAP note from the following therapy session transcript.
+    human: |
+      Please follow the SOAPNote schema strictly:
+      - Subjective: The client's own words about their feelings, symptoms, or concerns.
+      - Objective: The therapist's direct observations, measurable data, or test results.
+      - Assessment: Your clinical interpretation of the client's situation, progress, and any diagnostic impressions.
+      - Plan: The next steps to be taken, including future interventions, referrals, or adjustments in therapy.
+
+      If any of the fields are not mentioned, return them as null.
+
+      Transcript:
+      {text}
+
+  dap:
+    system: |
+      You are an expert therapist assistant. Extract a DAP note from the following therapy session transcript.
+    human: |
+      You are a mental health professional. Based on the transcript, produce a DAP note:
+
+      - Data: Include both subjective (client's words/feelings) and objective (observed behaviors, test results) in a factual manner.
+      - Assessment: Your interpretation, impression, or diagnosis based on the data.
+      - Plan: Outline next steps, goals, or interventions planned.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  birp:
+    system: |
+      You are an expert therapist assistant. Extract a BIRP note from the following therapy session transcript.
+    human: |
+      Please extract a BIRP note following this structure:
+
+      - Behavior: Client's behavior during the session (verbal/non-verbal) and observations.
+      - Intervention: Specific techniques and methods used by the therapist.
+      - Response: How the client responded to interventions.
+      - Plan: Follow-up steps and future recommendations.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  pirp:
+    system: |
+      You are an expert therapist assistant. Extract a PIRP note from the following therapy session transcript.
+    human: |
+      Please extract a PIRP note following this structure:
+
+      - Problem: The client's presenting problem, symptoms, or reason for seeking therapy.
+      - Intervention: Actions taken by the therapist to address the identified problem.
+      - Response: Client's reaction or changes after the intervention was applied.
+      - Plan: Next steps for addressing the problem, including future sessions, techniques, or referrals.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  girp:
+    system: |
+      You are an expert therapist assistant. Extract a GIRP note from the following therapy session transcript.
+    human: |
+      Please extract a GIRP note following this structure:
+
+      - Goals: The client's short-term and long-term therapy goals or objectives.
+      - Intervention: Therapeutic interventions used to help the client work toward these goals.
+      - Response: How the client responded to the interventions and their progress toward goals.
+      - Plan: Plan for future sessions, homework, referrals, or adjustments to help achieve goals.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  sirp:
+    system: |
+      You are an expert therapist assistant. Extract a SIRP note from the following therapy session transcript.
+    human: |
+      Please extract a SIRP note following this structure:
+
+      - Situation: The client's presenting situation, including current symptoms, concerns, and background info.
+      - Intervention: Interventions, assessments, and recommendations made during the session.
+      - Response: Client's response to the intervention, observed changes or feedback.
+      - Plan: Next steps, follow-up appointments, referrals, and any planned adjustments.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  fair_f_darp:
+    system: |
+      You are an expert therapist assistant. Extract a FAIR/F-DARP note from the following therapy session transcript.
+    human: |
+      Please extract a FAIR/F-DARP note following this structure:
+
+      - Focus: Focus of the note, such as a nursing diagnosis, event, or primary concern.
+      - Data: Subjective and objective data about the client/patient condition.
+      - Action: Actions taken by the provider in response to the data.
+      - Response: Client's response to the actions taken.
+      - Plan: Future steps or follow-up if using the full F-DARP format.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  dare:
+    system: |
+      You are an expert therapist assistant. Extract a DARE note from the following therapy session transcript.
+    human: |
+      Please extract a DARE note following this structure:
+
+      - Data: Subjective and objective client information and therapist's observations.
+      - Action: Specific actions, treatments, or interventions the therapist took.
+      - Response: Client's response to those actions, improvements, or changes in symptoms.
+      - Education: Education provided to the client about their condition, treatments, or coping strategies.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  pie:
+    system: |
+      You are an expert therapist assistant. Extract a PIE note from the following therapy session transcript.
+    human: |
+      Please extract a PIE note following this structure:
+
+      - Problem: Client's identified problem, whether mental health symptom or behavior issue.
+      - Intervention: What the therapist did to address the problem (techniques, strategies).
+      - Evaluation: How effective the intervention was, changes in the client, and next steps.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  soapier:
+    system: |
+      You are an expert therapist assistant. Extract a SOAPIER note from the following therapy session transcript.
+    human: |
+      Please extract a SOAPIER note following this structure:
+
+      - Subjective: Client's subjective complaints, feelings, statements.
+      - Objective: Observable, measurable data, test results, or observations.
+      - Assessment: Therapist's interpretation, diagnosis, or clinical judgment.
+      - Plan: Proposed interventions, follow-ups, or referrals.
+      - Intervention: Specific interventions implemented during the session.
+      - Evaluation: Client's response to interventions and progress made.
+      - Revision: Adjustments to the treatment plan based on evaluation.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  soapie:
+    system: |
+      You are an expert therapist assistant. Extract a SOAPIE note from the following therapy session transcript.
+    human: |
+      Please extract a SOAPIE note following this structure:
+
+      - Subjective: Client's self-reported experiences and symptoms.
+      - Objective: Observable data and measurable findings.
+      - Assessment: Clinician's interpretation and clinical impressions.
+      - Plan: Planned interventions, referrals, or changes.
+      - Intervention: Interventions used during the session.
+      - Evaluation: Client's response to interventions and progress toward goals.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  pomr:
+    system: |
+      You are an expert therapist assistant. Extract a POMR note from the following therapy session transcript.
+    human: |
+      Please extract a POMR note following this structure:
+
+      - Database: Patient's history, exam findings, and relevant tests.
+      - ProblemList: All identified problems, both active and resolved.
+      - InitialPlan: Initial plan to address each problem, including diagnostics or treatments.
+      - ProgressNotes: Ongoing progress, changes, and outcomes related to each problem.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  narrative:
+    system: |
+      You are an expert therapist assistant. Extract a Narrative note from the following therapy session transcript.
+    human: |
+      Please extract a Narrative note following this structure:
+
+      - Narrative: A free-form description of the session, events, observations, and client interactions.
+
+      If the section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  cbe:
+    system: |
+      You are an expert therapist assistant. Extract a CBE note from the following therapy session transcript.
+    human: |
+      Please extract a CBE note following this structure:
+
+      - Exceptions: Significant changes or unexpected findings from the norm, highlighting what differs.
+
+      If the section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+  sbar:
+    system: |
+      You are an expert therapist assistant. Extract a SBAR note from the following therapy session transcript.
+    human: |
+      Please extract a SBAR note following this structure:
+
+      - Situation: Brief description of the patient's current situation or issue.
+      - Background: Relevant background information, history, current meds, or past sessions.
+      - Assessment: Clinician's assessment of the current condition or problem.
+      - Recommendation: Suggested next steps, treatments, referrals, or actions.
+
+      If any section isn't applicable, return it as null.
+
+      Transcript:
+      {text}
+
+</file>
+<file name="langhub/prompts/__init__.py">
+# Package initialization
+
+</file>
+<file name="mockup/ProjectOverview.md">
+High-Level Overview
+
+This project is a “Therapy Note Taker” system that processes therapy session inputs—textual transcripts, YouTube video transcripts, or audio recordings—and generates structured therapy notes in various standardized formats (e.g., SOAP, DAP, BIRP). The system uses large language models (LLMs), prompt templates, and structured output schemas to automatically extract clinical note components. It also includes a frontend (Next.js, Tailwind CSS) for user interaction and a backend (Python, LangChain, LangGraph) for data processing and note generation.
+
+Main Concept
+	1.	Input Sources:
+	•	Text Input: Therapist can paste or type a raw session transcript.
+	•	YouTube URL: The system can download and process the session transcript from a YouTube video (assuming the video has captions).
+	•	Audio File: The system can transcribe an uploaded audio file (e.g., MP3) into text using a transcription service, then process the resulting transcript.
+	2.	Note Formats:
+The system supports various clinical note formats, each with its own schema and structure:
+	•	SOAP (Subjective, Objective, Assessment, Plan)
+	•	DAP (Data, Assessment, Plan)
+	•	BIRP (Behavior, Intervention, Response, Plan)
+	•	… and other formats like PIRP, GIRP, SIRP, FAIR/F-DARP, DARE, PIE, SOAPIER, SOAPIE, POMR, Narrative, CBE, SBAR.
+	3.	LLM Integration:
+The system uses LangChain and LangGraph to structure prompts and get outputs from LLMs (OpenAI GPT-4 or Google Gemini). It provides a prompt template for each note style, feeding the transcript to the LLM and expecting a JSON-like structured output that matches the chosen schema.
+	4.	Frontend:
+A Next.js-based frontend that:
+	•	Lets users choose input type (Text, YouTube, Audio).
+	•	Lets users choose note format.
+	•	Provides a form to submit these inputs.
+	•	Displays the generated note in real-time after the backend processes it.
+	5.	Backend:
+Python code handles:
+	•	Transcription (from audio to text).
+	•	Downloading transcripts from YouTube.
+	•	Running the LLM with a chosen prompt template and schema.
+	•	Returning structured results as YAML or JSON.
+	6.	Caching &amp; Persistence:
+A caching system stores transcripts and extracted notes to speed up subsequent requests.
+	7.	Project Structure:
+The code is divided into several directories and files for clarity:
+	•	app.py, main.py: Entry points for processing.
+	•	forms/: Pydantic schemas for each note type (e.g., SOAPNote, DAPNote).
+	•	utils/: Utilities for handling transcription, YouTube downloads, text splitting, caching.
+	•	config/: Configuration files, environment loading, credentials.
+	•	models/: LLM provider initialization.
+	•	langhub/: Prompt templates for each note format.
+	•	frontend/: Next.js frontend code with React components and Tailwind styling.
+
+Detailed Code Explanation
+
+Core Python Files and Their Roles
+	1.	app.py:
+This is a main backend script that can be invoked with command line arguments to process input and generate notes.
+	•	Command-line arguments allow specifying:
+	•	--input-text: The raw text input or URL
+	•	--form-type: The desired note format (e.g., “SOAP”)
+	•	--input-type: The type of input (“text”, “youtube”, “audio”)
+	•	--audio-file: Path to an audio file if input-type=audio
+	•	It determines how to fetch and process transcripts:
+	•	If input-type=audio, it transcribes the audio file.
+	•	If input-type=youtube, it extracts the video ID and downloads the captions.
+	•	Otherwise, it uses the provided text directly.
+	•	It loads the chosen schema (e.g., SOAPNote) and creates a “structured LLM” that can parse LLM outputs into that schema.
+	•	It sends the transcript to the LLM and gets back a structured object.
+	•	Formats the response as YAML.
+	•	Returns the formatted note or error message.
+	2.	main.py:
+Another entry point that demonstrates batch processing from given YouTube URLs. It uses functions:
+	•	process_session: Downloads a YouTube transcript, creates a chain, and runs the LLM on it.
+	•	create_extraction_chain: Loads the correct prompts from YAML and sets up a structured output schema for the LLM.
+This file is more of a demonstration script for processing multiple sessions at once.
+
+Data Models and Schemas (in forms/schemas.py)
+	•	Each note format is defined as a Pydantic model, e.g.:
+
+class SOAPNote(BaseModel):
+    Subjective: Optional[str]
+    Objective: Optional[str]
+    Assessment: Optional[str]
+    Plan: Optional[str]
+
+Similar classes exist for DAPNote, BIRPNote, etc. They define the required output structure that the LLM must adhere to. This ensures the output is well-structured and ready for clinical documentation.
+
+Prompt Templates (in langhub/prompts/therapy_extraction_prompt.yaml)
+	•	Each note format has a corresponding set of instructions:
+	•	A “system” message telling the LLM it is an expert therapist assistant.
+	•	A “human” message providing instructions on how to extract the note fields.
+	•	The transcript is inserted into the prompt dynamically.
+
+For example, for SOAP:
+
+soap:
+  system: |
+    You are an expert therapist assistant. Extract a SOAP note from the following therapy session transcript.
+  human: |
+    Please follow the SOAPNote schema...
+    Transcript:
+    {text}
+
+The {text} placeholder is where the session transcript is inserted at runtime.
+
+LLM Integration (in models/llm_provider.py)
+	•	get_llm() checks which provider is configured (openai or google_gemini).
+	•	For OpenAI, it uses ChatOpenAI, supplying API keys and model names.
+	•	For Google Gemini, it uses ChatGoogleGenerativeAI.
+	•	The chosen LLM is returned so that it can be integrated into the LangChain RunnableSequence (which is how prompts + structured outputs are managed).
+	•	The with_structured_output(schema=...) method on the LLM ensures the returned data matches the Pydantic schema.
+
+Transcription and YouTube Utilities (in utils)
+	•	utils/youtube.py:
+Extracts a video ID from a given YouTube URL and downloads transcripts using YouTubeTranscriptApi.
+	•	utils/audio.py &amp; utils/transcription.py:
+Converts audio files to WAV if needed, then sends them to the Deepgram API for transcription. This uses the TranscriptionService class that interacts with Deepgram’s API.
+
+Caching (in utils/cache.py)
+	•	The system implements a SQLite-based cache:
+	•	Stores transcripts keyed by video ID.
+	•	Stores extracted notes keyed by a hash of the input and note type.
+
+This speeds up repeated requests for the same input. It’s currently basic but can be extended.
+
+Configuration (in config)
+	•	.env.example and settings.py show how environment variables (like API keys) are loaded.
+	•	credentials.yaml is used for authentication and can be extended.
+
+Requirements and Build Files
+	•	requirements.txt: Python dependencies.
+	•	vercel.json: Deployment configuration if using Vercel.
+	•	README.md: Basic instructions on how to run and contribute.
+
+Frontend (in frontend directory)
+	•	The frontend is a Next.js project with TypeScript and Tailwind CSS.
+	•	Key Components:
+	•	page.tsx: The main homepage that renders:
+	•	A form (NoteForm) to input the session details.
+	•	A “Generated Note” panel to display the result.
+	•	NoteForm.tsx: A React component that:
+	•	Lets the user choose input type (text, YouTube, audio).
+	•	Lets the user paste or upload content.
+	•	Lets the user select note format (SOAP, DAP, etc.).
+	•	Submits the data to /api/generate route.
+	•	NoteResult.tsx: A component to display the generated note and provide a copy-to-clipboard feature.
+	•	Tailwind CSS and PostCSS configuration for styling.
+	•	Uses @vercel/next builder to deploy the frontend on Vercel.
+	•	api/generate/route.ts: A Next.js API route that:
+	•	Receives FormData from the frontend (including optional audio files).
+	•	Spawns the Python script app.py as a subprocess with the provided arguments.
+	•	Gathers the output and sends it back as JSON.
+
+Planned Features and Architecture for Future Enhancements
+
+The code and the table at the start outline additional features desired in the future:
+	1.	Coding Automation: Automatically generate billing codes (CPT codes) from the session details.
+	•	Inputs: Session notes, service types, coding guidelines.
+	•	Output: Billing codes ready for claims.
+	2.	Billing Automation: From generated codes and session info, create invoices automatically.
+	•	Inputs: Session notes, billing codes, payment details.
+	•	Output: Invoices and billing documents.
+	3.	Process Report Generation (External): Create client-friendly summary reports.
+	•	Input: Session notes.
+	•	Output: Summaries suitable for client review.
+	4.	Client Progress Dashboard: Visual dashboard tracking client’s progress over time.
+	•	Inputs: EHR data, session notes, treatment plans.
+	•	Output: Trend charts, metrics over time.
+	5.	Sentiment and Emotion Analysis: Analyze transcripts for emotional states and trends.
+	•	Input: Session transcripts.
+	•	Output: Reports on emotional states and sentiment trends.
+	6.	Session Insights: Quantitative metrics (talk time ratio, silences).
+	•	Input: Session recordings, transcripts.
+	•	Output: Statistical session insights.
+	7.	Personalized Resource Recommendations: Suggest external resources.
+	•	Input: Client data, therapy goals.
+	•	Output: Recommended articles, exercises, support groups.
+	8.	Treatment Plan Suggestions: Evidence-based recommendations for treatment plans.
+	•	Input: Client history, notes, guidelines.
+	•	Output: Draft treatment plans.
+	9.	Suggest Diagnosis / Golden Thread Diagnosis: Data-driven diagnostic suggestions and consistent patterns over multiple sessions.
+	•	Input: Transcripts, client history.
+	•	Output: Diagnostic suggestions, patterns over time.
+	10.	Custom Note Templates: Allow custom templates beyond the standard ones.
+	•	Input: Template customization.
+	•	Output: Reusable templates.
+	11.	Speech-to-Text Transcription Improvements: Already partially implemented with Deepgram. Could be extended to handle multiple languages or offline transcription.
+	12.	Automated Session Summarization: Summarize key points and next steps more succinctly.
+	13.	Natural Language Search and Query: Querying EHR data using natural language to quickly find relevant past sessions or client info.
+	14.	Intelligent Appointment Scheduling: Automatically manage scheduling, reminders, and rescheduling.
+
+These future features would require additional code, integration with EHR systems, more robust data handling, advanced analytics, and stable LLM-powered reasoning to provide reliable insights.
+
+Conclusion
+
+The current system is a foundation that:
+	•	Takes therapy sessions (from text, YouTube, or audio).
+	•	Uses LLMs to generate standardized clinical notes.
+	•	Supports multiple note formats via a prompt-based approach.
+	•	Provides a user-friendly frontend and a flexible backend.
+
+The architecture is modular and can be extended to support the full range of desired features: from administrative (coding, billing) to analytical (sentiment analysis, dashboards) to clinical decision support (treatment plan suggestions, diagnosis hints).
+
+This documentation should give a clear, detailed understanding of the code’s current state, functionality, and envisioned enhancements.
+</file>
+<file name="mockup/Design.md">
+Below is a detailed, step-by-step design proposal for the frontend to incorporate and elegantly present the listed features. Since you’ve mentioned you have an existing application for testing, we’ll build on top of your current Next.js/Tailwind setup and integrate these functionalities into a coherent UI/UX. The design approach will focus on user-centered interfaces, clear information hierarchy, and interactive visualization tools. We’ll use a dashboard-style layout that allows therapists to access administrative, clinical decision support, client insights, and documentation features from a unified interface.
+
+### Overall Design Principles
+
+1. **Responsive Layout:**  
+   Ensure a responsive design that works well on desktops, tablets, and larger mobile devices (e.g., iPads), as therapists may use tablets in-session.
+   
+2. **Intuitive Navigation:**  
+   Utilize a vertical navigation bar on the left side and a top bar with contextual actions. The left nav will categorize features by their domain: 
+   - **Clients &amp; Sessions**
+   - **Documentation &amp; Notes**
+   - **Administrative Assistance**
+   - **Analytics &amp; Reporting**
+   - **Clinical Decision Support**
+   - **Client Support &amp; Resources**
+
+3. **Consistent Branding and Color Coding:**  
+   Continue using neutral backgrounds (white/gray) with subtle blues from your current theme. Use subtle accent colors (blue for actionable buttons, green for success states, red for alerts) and standard Tailwind typography.
+
+4. **Modular Cards and Panels:**  
+   Break down complex features into cards, modals, and collapsible panels. This makes large amounts of data more digestible and helps users focus on what’s relevant.
+
+---
+
+### Navigation Structure
+
+**Left Sidebar:**  
+- **Dashboard (Home)**  
+- **Clients &amp; Sessions**  
+  - Client Profiles  
+  - Session Records
+- **Documentation &amp; Notes**  
+  - Note Generation  
+  - Custom Templates
+- **Administrative Assistance**  
+  - Coding Automation  
+  - Billing Automation
+- **Analytics &amp; Reporting**  
+  - Client Progress Dashboard  
+  - Process/Report Generation (External)
+- **Client Insight &amp; Feedback**  
+  - Sentiment &amp; Emotion Analysis  
+  - Session Insights
+- **Client Support &amp; Resources**  
+  - Personalized Resource Recommendations  
+  - Insights &amp; Suggestions
+- **Clinical Decision Support**  
+  - Treatment Plan Suggestions  
+  - Suggest Diagnosis  
+  - Golden Thread Diagnosis
+- **Scheduling &amp; Administration**  
+  - Intelligent Appointment Scheduling
+  - Natural Language Search and Query
+
+**Top Navbar:**  
+- Quick search bar (natural language search)  
+- Notifications (billing alerts, scheduling notifications)  
+- User profile &amp; settings
+
+---
+
+### Feature-by-Feature Design Detailing
+
+#### 1. Coding Automation &amp; Billing Automation (Administrative Assistance)
+
+**Location in UI:** Under “Administrative Assistance”.
+
+**User Flow:**
+- Therapist selects a recently completed session from a sessions list view.
+- On the session details page, there’s an “Administrative” tab.
+- Within the “Administrative” tab:
+  - **Coding Automation Panel:** The system displays suggested CPT codes and rationale. The user can confirm or edit these codes.
+  - **Billing Automation Panel:** Once codes are confirmed, the system auto-generates invoices. A “Generate Invoice” button triggers a modal showing invoice details (client name, service provided, fee). Therapist can finalize the invoice or adjust details before submission.
+
+**UI Elements:**
+- **Session Detail Page**: Tabs: “Overview”, “Notes”, “Administrative”, “Analytics”.
+- **Coding Suggestion Card:** Shows recommended CPT codes, a short reason, and a dropdown for alternate codes if needed.
+- **Invoice Preview Modal:** Itemized charges, payable amount, client details, and a “Submit to Insurance” or “Mark as Paid” button.
+
+#### 2. Process Report Generation for External Sharing (Analytics &amp; Reporting)
+
+**Location:** Under “Analytics &amp; Reporting” in the main navigation.
+
+**User Flow:**
+- Therapist goes to “Analytics &amp; Reporting” → “External Reports”.
+- Select a client and a session range.
+- A form to specify what level of detail to include (avoid clinical jargon, emphasize key progress points).
+- Generate a downloadable PDF (with a “Download” button) or share a secure link.
+
+**UI Elements:**
+- **Report Configuration Panel:** Date range picker, toggle switches for including certain data (goals, improvements, homework compliance, etc.).
+- **Preview Pane:** Shows a preview of the client-friendly summary.
+
+#### 3. Client Progress Dashboard (Analytics &amp; Reporting)
+
+**Location:** Also under “Analytics &amp; Reporting”.
+
+**User Flow:**
+- Therapist selects a client from a dropdown.
+- The dashboard displays:
+  - Mood trend line chart (scales of mood rating over time).
+  - Session attendance history (bar or timeline chart).
+  - Goals and progress indicators (progress bars or checkmarks).
+- Interactive hover for data points: therapist hovers over a data point to see session notes.
+
+**UI Elements:**
+- **Charts and Graphs:** Line chart for mood over time, bar chart for attendance, a panel listing goals and their completion percentages.
+- **Filters:** Date range filters, toggle for showing/hiding certain metrics.
+
+#### 4. Sentiment and Emotion Analysis (Client Insight &amp; Feedback)
+
+**Location:** Under “Client Insight &amp; Feedback”.
+
+**User Flow:**
+- Therapist opens a specific client’s session transcripts page.
+- Select “Sentiment Analysis” tab to see:
+  - Overall sentiment trend line over multiple sessions.
+  - Word cloud or key emotion tags.
+- Click on a particular session to see detailed sentiment analysis (e.g., percentages of sadness, anxiety, etc.).
+
+**UI Elements:**
+- **Emotion Summary Cards:** Cards showing dominant emotions each session (e.g., “Session 3: 70% anxious tone”).
+- **Trend Charts:** A line or stacked area chart of sentiment categories over time.
+- **Word Cloud:** Color-coded words frequently used by the client.
+
+#### 5. Session Insights (Client Insight &amp; Feedback)
+
+**Location:** Same general section as Sentiment Analysis.
+
+**User Flow:**
+- On a session’s detail page, select the “Session Insights” tab.
+- Displays talk-time ratio in a donut chart: “Client spoke 60%, Therapist 40%”.
+- Shows periods of silence or high activity as a timeline or waveform snippet.
+- Therapist can toggle “Show Transcript Snippets” at silence points.
+
+**UI Elements:**
+- **Metrics Cards:** Talk time ratio, number of interruptions, silence durations.
+- **Timeline Visualization:** A horizontal timeline with segments highlighted where client or therapist spoke, and silences marked.
+
+#### 6. Personalized Resource Recommendations &amp; Insights/Suggestions (Client Support &amp; Resources)
+
+**Location:** Under “Client Support &amp; Resources”.
+
+**User Flow:**
+- Therapist selects a client or session to see recommended resources.
+- Cards or a list of recommended articles, exercises, or support groups, each with a brief reason why it’s recommended.
+- “Insights &amp; Suggestions” pre-/post-session: A small panel before a session to show “pre-session brief” and after session “homework suggestions”.
+
+**UI Elements:**
+- **Resource Recommendation Card:** Title, short description, link, and relevance tag (e.g., “based on recent anxiety scores”).
+- **Session Preparation Panel:** Pre-session checklist (embedded in upcoming appointment view), in-session guidance popup suggestions, and post-session assignment cards.
+
+#### 7. Treatment Plan Suggestions, Suggest Diagnosis, Golden Thread Diagnosis (Clinical Decision Support)
+
+**Location:** Under “Clinical Decision Support”.
+
+**User Flow:**
+- Therapist accesses a “Clinical Decision Support” page for a given client.
+- **Treatment Plan Suggestions Tab:** A list of recommended goals and interventions (editable fields).
+- **Suggest Diagnosis Tab:** AI-generated probable diagnoses with confidence scores, a “Compare with DSM criteria” button.
+- **Golden Thread Diagnosis Tab:** A historical analysis summing up recurring themes, ensuring treatment is coherent over time.
+
+**UI Elements:**
+- **Diagnosis Suggestion Cards:** Each card includes code, description, confidence score. Accept or reject buttons.
+- **Treatment Plan Editor:** A form pre-filled with suggested goals and interventions. Therapist can modify and save to the client record.
+- **Golden Thread Visualization:** A timeline or summary text block highlighting consistent diagnostic themes.
+
+#### 8. Documentation &amp; Notes (Custom Templates, Note Generation, Speech-to-Text, Automated Summarization)
+
+**Location:** Under “Documentation &amp; Notes”.
+
+**User Flow:**
+- Therapist chooses a note format (SOAP, BIRP, etc.) from a templates dropdown.
+- **Note Generation Tool:** Upload session audio or paste transcript. The system auto-generates a draft note. Therapist can edit and save.
+- **Custom Templates:** A “Manage Templates” page to create or edit templates.  
+- **Speech-to-Text Transcription &amp; Summarization:** Upload audio, get the transcript and a summarized note suggestion. Present a side-by-side view: transcript on left, generated summary/note on right for quick comparison.
+
+**UI Elements:**
+- **Two-column layout:** Left column shows transcript or audio upload tool, right column shows generated note draft.
+- **Template Selector:** A dropdown or modal listing available templates. Once selected, the note fields appear.
+- **Summarization Card:** Key highlights and bullet points extracted from the transcript.
+
+#### 9. Natural Language Search &amp; Query (Information Retrieval)
+
+**Location:** A global search bar in the top navbar.
+
+**User Flow:**
+- Therapist types a natural language query, like “Show me all sessions where the client mentioned panic attacks in the last 3 months.”
+- Search results page lists sessions matching criteria, highlight keywords from transcripts.
+
+**UI Elements:**
+- **Search Input in Navbar:** Large, easy to type in.
+- **Result List:** Sessions listed in chronological order with snippet of transcript showing the queried term highlighted.
+- **Filters on Results Page:** Adjust date range, client filters, or note formats from a sidebar on the results page.
+
+#### 10. Intelligent Appointment Scheduling (Scheduling &amp; Administration)
+
+**Location:** Under “Scheduling &amp; Administration”.
+
+**User Flow:**
+- Therapist opens a calendar view integrated with their schedule and clients’ preferred times.
+- System suggests best slots based on therapist and client availability.
+- Clicking a suggested slot opens a confirmation modal (include time zone adjustments, send automatic reminders toggle).
+
+**UI Elements:**
+- **Calendar View:** Monthly/Weekly view with available/unavailable blocks highlighted.
+- **Suggestion Panel:** Recommended appointment times appear as a side panel with reasoning (e.g., “Client and therapist both free, no conflicts”).
+- **Confirmation Dialog:** Shows final details and a “Send Reminder” checkbox.
+
+---
+
+### Cross-Feature UI Enhancements
+
+- **Status Indicators:** Use small badges or icons to indicate if billing is pending, if a suggested diagnosis is available, or if resources are recommended.
+- **Modals &amp; Drawers:** For quick tasks like editing a code, adding a resource, or confirming an invoice, use modals. For multi-step tasks, consider a slide-in drawer from the right side.
+- **Notifications System:** Top-right dropdown showing pending tasks: e.g., “2 bills ready to submit,” “1 new suggested diagnosis.”
+
+---
+
+### Responsive and Accessibility Considerations
+
+- **Responsive Charts:** Use libraries like Chart.js or Recharts configured for responsive display.
+- **Accessible Color Contrast:** Ensure text contrast meets WCAG AA standards.  
+- **Keyboard Navigation &amp; Screen Readers:** All interactive elements have focus states and ARIA labels.
+
+---
+
+### Example Layout Mockup (High-Level)
+
+**Home Dashboard:**
+- Top: Quick stats (Next appointment, pending bills, # of clients with new suggested diagnoses)
+- Middle: Graphical summary (Average mood score of all clients this week)
+- Bottom: Quick links to recent sessions or notes needing review.
+
+**Client Detail Page:**
+- Tabs: Overview | Sessions | Notes | Insights | Admin | Plan
+- Overview: Basic client info, top goals, quick metrics
+- Sessions: List of past sessions, each linking to transcripts, notes, and admin features
+- Notes: A list of generated and manually written notes
+- Insights: Sentiment and session dynamics charts
+- Admin: Billing and coding
+- Plan: Treatment suggestions and diagnoses
+
+---
+
+### Implementation Details
+
+- **Tech Stack:**  
+  Continue with Next.js (pages/app directory), TailwindCSS for styling, maybe integrate a UI library like Headless UI or Radix for better modal and dropdown accessibility.
+- **State Management:**  
+  Consider using React Query or SWR for data fetching from your API.  
+- **Testing and Validation:**  
+  Use Cypress or Playwright to test critical user flows (e.g., generating a note, scheduling an appointment).
+
+---
+
+### Conclusion
+
+This design integrates all listed features into a cohesive, user-friendly dashboard tailored to therapists’ workflows. It prioritizes clarity, consistency, and ease of use—making sure the therapist can quickly access administrative tasks, review analytics, generate documentation, and leverage clinical decision support tools without becoming overwhelmed. Each feature is compartmentalized in logically grouped menu sections, with filters, charts, cards, and modals guiding the user through complex functionalities step-by-step.
+</file>
+</source>
