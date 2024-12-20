@@ -314,18 +314,19 @@ def process_arxiv_pdf(arxiv_abs_url, max_tokens=None):
     content = ' '.join(text)
     
     # Truncate content if needed
-    content, was_truncated, truncation_percentage = truncate_text_to_tokens(content, max_tokens)
-    
-    # Get token count
-    token_count = get_token_count(content)
-    if was_truncated:
-        print(f"Token count: {token_count} (truncated from larger file, {truncation_percentage}%)")
-    else:
-        print(f"Token count: {token_count}")
+    if max_tokens:
+        content, was_truncated, truncation_percentage = truncate_text_to_tokens(content, max_tokens)
+        
+        # Get token count
+        token_count = get_token_count(content)
+        if was_truncated:
+            print(f"Token count: {token_count} (truncated from larger file, {truncation_percentage}%)")
+        else:
+            print(f"Token count: {token_count}")
 
     formatted_text = f'<source type="arxiv_paper" url="{escape_xml(arxiv_abs_url)}">\n'
     formatted_text += '<paper>\n'
-    if was_truncated:
+    if max_tokens and was_truncated:
         formatted_text += f'<!-- Content truncated to {max_tokens} tokens -->\n'
     formatted_text += escape_xml(content)
     formatted_text += '\n</paper>\n'
@@ -454,7 +455,7 @@ def process_pdf(url, max_tokens=None):
     os.remove('temp.pdf')
     return ' '.join(text)
 
-def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs):
+def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs, max_tokens=None):
     visited_urls = set()
     urls_to_visit = [(base_url, 0)]
     processed_urls = []
@@ -657,7 +658,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
 
     return formatted_text
     
-def process_github_issue(issue_url, excluded_dirs=None):
+def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None):
     url_parts = issue_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -707,7 +708,7 @@ def process_github_issue(issue_url, excluded_dirs=None):
     formatted_text += '</issue_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url, excluded_dirs)
+    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=max_tokens)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content

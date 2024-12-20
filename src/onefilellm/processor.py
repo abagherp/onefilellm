@@ -145,30 +145,30 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
         try:
             if "github.com" in input_path:
                 if "/pull/" in input_path:
-                    final_output = process_github_pull_request(input_path, custom_excluded_dirs)
+                    final_output = process_github_pull_request(input_path, custom_excluded_dirs, max_tokens)
                 elif "/issues/" in input_path:
-                    final_output = process_github_issue(input_path, custom_excluded_dirs)
+                    final_output = process_github_issue(input_path, custom_excluded_dirs, max_tokens)
                 else:
-                    final_output = process_github_repo(input_path, custom_excluded_dirs)
+                    final_output = process_github_repo(input_path, custom_excluded_dirs, max_tokens)
             elif urlparse(input_path).scheme in ["http", "https"]:
                 if "youtube.com" in input_path or "youtu.be" in input_path:
-                    final_output = fetch_youtube_transcript(input_path)
+                    final_output = fetch_youtube_transcript(input_path, max_tokens)
                 elif "arxiv.org" in input_path:
-                    final_output = process_arxiv_pdf(input_path)
+                    final_output = process_arxiv_pdf(input_path, max_tokens)
                 else:
-                    crawl_result = crawl_and_extract_text(input_path, max_depth=2, include_pdfs=True, ignore_epubs=True)
+                    crawl_result = crawl_and_extract_text(input_path, max_depth=2, include_pdfs=True, ignore_epubs=True, max_tokens=max_tokens)
                     final_output = crawl_result['content']
                     with open(urls_list_file, 'w', encoding='utf-8') as urls_file:
                         urls_file.write('\n'.join(crawl_result['processed_urls']))
             elif input_path.startswith("10.") and "/" in input_path or input_path.isdigit():
-                final_output = process_doi_or_pmid(input_path)
+                final_output = process_doi_or_pmid(input_path, max_tokens)
             else:
                 final_output = process_local_folder(input_path, max_tokens, custom_excluded_dirs)
 
             progress.update(task, advance=50)
 
             # Write the uncompressed output
-            with open(output_file, "w", encoding="utf-8") as file:
+            with open(output_file, "w", encoding='utf-8') as file:
                 file.write(final_output)
 
             # Process the compressed output
