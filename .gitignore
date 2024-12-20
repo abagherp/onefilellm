@@ -126,3 +126,7 @@ Thumbs.db
 output/*
 aspect_analysis_uncompressed.txt
 output_uncompressed.txt
+note-taker_uncompressed.txt
+my-dashboard_uncompressed.txt
+*_uncompressed.txt
+*_compressed.txt

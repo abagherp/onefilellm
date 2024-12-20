@@ -54,15 +54,20 @@ def is_allowed_filetype(filename):
     """Check if a file should be processed based on extension"""
     return any(filename.endswith(ext) for ext in ALLOWED_EXTENSIONS) and \
            not any(fnmatch(filename, pattern) for pattern in EXCLUDED_FILES)
-
 def process_ipynb_file(temp_file):
-    """Convert Jupyter notebook to Python code"""
+    """Convert Jupyter notebook to Python code, excluding cell outputs"""
     try:
         with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
             notebook_content = f.read()
 
+        notebook = nbformat.reads(notebook_content, as_version=4)
+        # Remove all outputs from cells
+        for cell in notebook.cells:
+            if 'outputs' in cell:
+                cell.outputs = []
+
         exporter = PythonExporter()
-        python_code, _ = exporter.from_notebook_node(nbformat.reads(notebook_content, as_version=4))
+        python_code, _ = exporter.from_notebook_node(notebook)
         return python_code
     except Exception as e:
         print(f"Warning: Error processing notebook {temp_file}: {str(e)}")
@@ -172,7 +177,7 @@ def process_local_directory(local_path, output):
 
                 output.write("\n\n")
 
-def process_github_repo(repo_url, excluded_dirs=None):
+def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None):
     api_base_url = "https://api.github.com/repos/"
     repo_url_parts = repo_url.split("https://github.com/")[-1].split("/")
     repo_name = "/".join(repo_url_parts[:2])
@@ -187,7 +192,7 @@ def process_github_repo(repo_url, excluded_dirs=None):
 
     repo_content = [f'<source type="github_repository" url="{repo_url}">']
 
-    def process_directory(url, repo_content):
+    def process_directory(url, repo_content, max_tokens=None):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         files = response.json()
@@ -212,17 +217,30 @@ def process_github_repo(repo_url, excluded_dirs=None):
                 repo_content.append(f'<file name="{escape_xml(file["path"])}">') 
 
                 if file["name"].endswith(".ipynb"):
-                    repo_content.append(escape_xml(process_ipynb_file(temp_file)))
+                    file_content = process_ipynb_file(temp_file)
                 else:
                     with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
-                        repo_content.append(escape_xml(f.read()))
+                        file_content = f.read()
 
+                # Truncate content if needed
+                if max_tokens:
+                    file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
+                    
+                    # Get token count for this file
+                    file_token_count = get_token_count(file_content)
+                    if was_truncated:
+                        print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
+                        repo_content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
+                    else:
+                        print(f"Token count: {file_token_count}")
+
+                repo_content.append(escape_xml(file_content))
                 repo_content.append('</file>')
                 os.remove(temp_file)
             elif file["type"] == "dir":
-                process_directory(file["url"], repo_content)
+                process_directory(file["url"], repo_content, max_tokens)
 
-    process_directory(contents_url, repo_content)
+    process_directory(contents_url, repo_content, max_tokens)
     repo_content.append('</source>')
     print("All files processed.")
 
@@ -261,18 +279,17 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
                         file_content = f.read()
                 
                 # Truncate content if needed
-                file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
-                
-                # Get token count for this file
-                file_token_count = get_token_count(file_content)
-                if was_truncated:
-                    print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
-                else:
-                    print(f"Token count: {file_token_count}")
-                
-                if was_truncated:
-                    content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
-                
+                if max_tokens:
+                    file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
+                    
+                    # Get token count for this file
+                    file_token_count = get_token_count(file_content)
+                    if was_truncated:
+                        print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
+                        content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
+                    else:
+                        print(f"Token count: {file_token_count}")
+
                 content.append(escape_xml(file_content))
                 content.append('</file>')
 
@@ -280,7 +297,7 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
     print("All files processed.")
     return '\n'.join(content)
 
-def process_arxiv_pdf(arxiv_abs_url):
+def process_arxiv_pdf(arxiv_abs_url, max_tokens=None):
     pdf_url = arxiv_abs_url.replace("/abs/", "/pdf/") + ".pdf"
     response = requests.get(pdf_url)
     pdf_content = response.content
@@ -294,9 +311,23 @@ def process_arxiv_pdf(arxiv_abs_url):
         for page in range(len(pdf_reader.pages)):
             text.append(pdf_reader.pages[page].extract_text())
 
-    formatted_text = f'<source type="arxiv_paper" url="{arxiv_abs_url}">\n'
+    content = ' '.join(text)
+    
+    # Truncate content if needed
+    content, was_truncated, truncation_percentage = truncate_text_to_tokens(content, max_tokens)
+    
+    # Get token count
+    token_count = get_token_count(content)
+    if was_truncated:
+        print(f"Token count: {token_count} (truncated from larger file, {truncation_percentage}%)")
+    else:
+        print(f"Token count: {token_count}")
+
+    formatted_text = f'<source type="arxiv_paper" url="{escape_xml(arxiv_abs_url)}">\n'
     formatted_text += '<paper>\n'
-    formatted_text += escape_xml(' '.join(text))
+    if was_truncated:
+        formatted_text += f'<!-- Content truncated to {max_tokens} tokens -->\n'
+    formatted_text += escape_xml(content)
     formatted_text += '\n</paper>\n'
     formatted_text += '</source>'
 
@@ -316,7 +347,7 @@ def extract_links(input_file, output_file):
         for url in urls:
             output.write(url + '\n')
 
-def fetch_youtube_transcript(url):
+def fetch_youtube_transcript(url, max_tokens=None):
     def extract_video_id(url):
         pattern = r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
         match = re.search(pattern, url)
@@ -333,9 +364,18 @@ def fetch_youtube_transcript(url):
         formatter = TextFormatter()
         transcript = formatter.format_transcript(transcript_list)
         
+        # Apply token truncation if max_tokens specified
+        original_tokens = count_tokens(transcript)
+        if max_tokens:
+            transcript = truncate_text_to_tokens(transcript, max_tokens)
+            truncated_tokens = count_tokens(transcript)
+            print(f"YouTube transcript tokens: {truncated_tokens}/{original_tokens}")
+        
         formatted_text = f'<source type="youtube_transcript" url="{escape_xml(url)}">\n'
         formatted_text += '<transcript>\n'
         formatted_text += escape_xml(transcript)
+        if max_tokens and truncated_tokens < original_tokens:
+            formatted_text += f'\n<!-- Truncated from {original_tokens} to {truncated_tokens} tokens -->'
         formatted_text += '\n</transcript>\n'
         formatted_text += '</source>'
         
@@ -398,7 +438,7 @@ def is_within_depth(base_url, current_url, max_depth):
 
     return len(current_parts) - len(base_parts) <= max_depth
 
-def process_pdf(url):
+def process_pdf(url, max_tokens=None):
     response = requests.get(url)
     response.raise_for_status()
 
@@ -434,7 +474,7 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs):
                 visited_urls.add(clean_url)
 
                 if clean_url.endswith('.pdf') and include_pdfs:
-                    text = process_pdf(clean_url)
+                    text = process_pdf(clean_url, max_tokens=max_tokens)
                 else:
                     for element in soup(['script', 'style', 'head', 'title', 'meta', '[document]']):
                         element.decompose()
@@ -442,8 +482,16 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs):
                     for comment in comments:
                         comment.extract()
                     text = soup.get_text(separator='\n', strip=True)
+                    
+                    # Apply token truncation
+                    original_tokens = count_tokens(text)
+                    text = truncate_text_to_tokens(text, max_tokens)
+                    final_tokens = count_tokens(text)
+                    print(f"URL: {clean_url} - Tokens: {final_tokens}/{original_tokens}")
 
                 all_text.append(f'<page url="{escape_xml(clean_url)}">')
+                if final_tokens < original_tokens:
+                    all_text.append(f'<!-- Content truncated from {original_tokens} to {final_tokens} tokens -->')
                 all_text.append(escape_xml(text))
                 all_text.append('</page>')
                 processed_urls.append(clean_url)
@@ -466,7 +514,7 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs):
         'processed_urls': processed_urls
     }
 
-def process_doi_or_pmid(identifier):
+def process_doi_or_pmid(identifier, max_tokens=None):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36',
         'Connection': 'keep-alive'
@@ -523,7 +571,7 @@ def process_doi_or_pmid(identifier):
         print("Sci-hub appears to be inaccessible or the document was not found. Please try again later.")
         return error_text
         
-def process_github_pull_request(pull_request_url, excluded_dirs=None):
+def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens=None):
     url_parts = pull_request_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -539,6 +587,11 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None):
     diff_response = requests.get(diff_url, headers=headers)
     pull_request_diff = diff_response.text
 
+    diff_tokens = count_tokens(pull_request_diff)
+    if max_tokens:
+        pull_request_diff = truncate_text_to_tokens(pull_request_diff, max_tokens // 2)
+        print(f"PR diff tokens: {diff_tokens} (truncated to {max_tokens // 2})")
+    
     comments_url = pull_request_data["comments_url"]
     review_comments_url = pull_request_data["review_comments_url"]
     comments_response = requests.get(comments_url, headers=headers)
@@ -552,11 +605,27 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None):
     formatted_text = f'<source type="github_pull_request" url="{pull_request_url}">\n'
     formatted_text += '<pull_request_info>\n'
     formatted_text += f'<title>{escape_xml(pull_request_data["title"])}</title>\n'
-    formatted_text += f'<description>{escape_xml(pull_request_data["body"])}</description>\n'
+    
+    description = pull_request_data["body"]
+    desc_tokens = count_tokens(description)
+    if max_tokens:
+        description = truncate_text_to_tokens(description, max_tokens // 4)
+        if desc_tokens > max_tokens // 4:
+            formatted_text += f'<description truncated="true" original_tokens="{desc_tokens}">'
+        else:
+            formatted_text += '<description>'
+    else:
+        formatted_text += '<description>'
+    formatted_text += f'{escape_xml(description)}</description>\n'
+
     formatted_text += '<merge_details>\n'
     formatted_text += f'{escape_xml(pull_request_data["user"]["login"])} wants to merge {pull_request_data["commits"]} commit into {repo_owner}:{pull_request_data["base"]["ref"]} from {pull_request_data["head"]["label"]}\n'
     formatted_text += '</merge_details>\n'
-    formatted_text += '<diff_and_comments>\n'
+    
+    if diff_tokens > max_tokens // 2:
+        formatted_text += f'<diff_and_comments truncated="true" original_tokens="{diff_tokens}">\n'
+    else:
+        formatted_text += '<diff_and_comments>\n'
 
     diff_lines = pull_request_diff.split("\n")
     comment_index = 0
@@ -576,7 +645,8 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None):
     formatted_text += '</pull_request_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url, excluded_dirs)
+    remaining_tokens = max_tokens - count_tokens(formatted_text) if max_tokens else None
+    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=remaining_tokens)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -587,17 +657,6 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None):
 
     return formatted_text
     
-def escape_xml(text):
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        # Remove the following lines to stop converting apostrophes and quotes
-        # .replace("\"", "&quot;")
-        # .replace("'", "&apos;")
-    )
-
 def process_github_issue(issue_url, excluded_dirs=None):
     url_parts = issue_url.split("/")
     repo_owner = url_parts[3]

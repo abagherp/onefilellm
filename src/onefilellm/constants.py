@@ -22,7 +22,13 @@ EXCLUDED_FILES = [
     'instructions.md',
     'package-lock.json',
     '*_uncompressed.txt',
-    '*_compressed.txt'
+    '*_compressed.txt',
+    '*.png',
+    '*.jpg',
+    '*.jpeg',
+    '*.gif',
+    '*.svg',
+    '*.ico',
 ]
 
 # Token settings
