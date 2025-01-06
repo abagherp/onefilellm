@@ -11,7 +11,7 @@ ALLOWED_EXTENSIONS = [
     '.py', '.txt', '.js', '.tsx', '.ts', '.md', 
     '.cjs', '.html', '.json', '.ipynb', '.h',
     '.localhost', '.sh', '.yaml', '.example',
-    '.jsx'
+    '.jsx', '.csv', '.R', '.Rmd'
 ]
 
 EXCLUDED_FILES = [

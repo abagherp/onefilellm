@@ -50,24 +50,71 @@ def download_file(url, target_path):
     with open(target_path, "wb") as f:
         f.write(response.content)
 
-def is_allowed_filetype(filename):
+def get_token_count(text, disallowed_special=[], chunk_size=1000):
+    """Count tokens in text, removing XML tags first."""
+    text_without_tags = re.sub(r'<[^>]+>', '', text)
+    chunks = [text_without_tags[i:i+chunk_size] for i in range(0, len(text_without_tags), chunk_size)]
+    enc = tiktoken.get_encoding(DEFAULT_ENCODING)
+    return sum(len(enc.encode(chunk, disallowed_special=disallowed_special)) for chunk in chunks)
+
+def is_allowed_filetype(filename, excluded_exts=None):
     """Check if a file should be processed based on extension"""
-    return any(filename.endswith(ext) for ext in ALLOWED_EXTENSIONS) and \
-           not any(fnmatch(filename, pattern) for pattern in EXCLUDED_FILES)
+    # First check if the file is in the excluded patterns
+    if any(fnmatch(filename, pattern) for pattern in EXCLUDED_FILES):
+        return False
+        
+    # Get the file extension
+    _, ext = os.path.splitext(filename)
+    
+    # If there are excluded extensions, check those first
+    if excluded_exts and ext in excluded_exts:
+        return False
+        
+    # Finally check if it's in the allowed extensions
+    return ext in ALLOWED_EXTENSIONS
+
+def remove_base64_content(text):
+    """Remove base64 encoded content from text."""
+    # Remove markdown image with base64
+    text = re.sub(r'!\[.*?\]\(data:image/[^;]+;base64,[^)]+\)', '[BASE64_IMAGE_REMOVED]', text)
+    # Remove HTML img with base64
+    text = re.sub(r'<img[^>]+src="data:image/[^;]+;base64,[^"]+"[^>]*>', '[BASE64_IMAGE_REMOVED]', text)
+    # Remove raw base64 strings
+    text = re.sub(r'data:image/[^;]+;base64,[a-zA-Z0-9+/=\n]+', '[BASE64_IMAGE_REMOVED]', text)
+    return text
+
+def clean_notebook_output(text):
+    """Clean notebook output by removing In[] lines and consolidating empty lines."""
+    # Remove "# In[X]:" lines (with any number or empty brackets)
+    text = re.sub(r'#\s*In\s*\[\s*\d*\s*\]:\s*\n', '', text)
+    # Consolidate multiple empty lines into a single empty line
+    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+    return text
+
 def process_ipynb_file(temp_file):
     """Convert Jupyter notebook to Python code, excluding cell outputs"""
     try:
         with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
             notebook_content = f.read()
 
+        # Remove base64 content before parsing
+        notebook_content = remove_base64_content(notebook_content)
+        
         notebook = nbformat.reads(notebook_content, as_version=4)
         # Remove all outputs from cells
         for cell in notebook.cells:
             if 'outputs' in cell:
                 cell.outputs = []
+            # Clean markdown cells
+            if cell.get('cell_type') == 'markdown' and 'source' in cell:
+                cell.source = remove_base64_content(cell.source)
 
         exporter = PythonExporter()
         python_code, _ = exporter.from_notebook_node(notebook)
+        
+        # Clean up the exported code
+        python_code = clean_notebook_output(python_code)
+        
         return python_code
     except Exception as e:
         print(f"Warning: Error processing notebook {temp_file}: {str(e)}")
@@ -81,16 +128,73 @@ def escape_xml(text):
         .replace(">", "&gt;")
     )
 
-def truncate_text_to_tokens(text, max_tokens):
-    """Truncate text to max tokens"""
-    if not max_tokens:
-        return text, False, 100
-    enc = tiktoken.get_encoding(DEFAULT_ENCODING)
-    tokens = enc.encode(text)
-    if len(tokens) <= max_tokens:
-        return text, False, 100
-    truncated_tokens = tokens[:max_tokens]
-    return enc.decode(truncated_tokens), True, 100*round(len(truncated_tokens)/len(tokens), 2)
+class TokenManager:
+    """Centralized class for managing token-related operations."""
+    
+    def __init__(self, encoding=DEFAULT_ENCODING, chunk_size=DEFAULT_CHUNK_SIZE):
+        """Initialize the TokenManager with encoding and chunk size."""
+        self.encoding = encoding
+        self.chunk_size = chunk_size
+        self.enc = tiktoken.get_encoding(encoding)
+        # Allow all special tokens to avoid errors
+        self.disallowed_special = ()
+    
+    def count_tokens(self, text, disallowed_special=None):
+        """Count tokens in text, removing XML tags first."""
+        text_without_tags = re.sub(r'<[^>]+>', '', text)
+        chunks = [text_without_tags[i:i+self.chunk_size] for i in range(0, len(text_without_tags), self.chunk_size)]
+        disallowed = self.disallowed_special if disallowed_special is None else disallowed_special
+        return sum(len(self.enc.encode(chunk, disallowed_special=disallowed)) for chunk in chunks)
+    
+    def truncate_text(self, text, max_tokens):
+        """
+        Truncate text to max tokens and return truncation info.
+        
+        Returns:
+            tuple: (truncated_text, was_truncated, truncation_percentage)
+        """
+        if not max_tokens:
+            return text, False, 100
+            
+        tokens = self.enc.encode(text, disallowed_special=self.disallowed_special)
+        if len(tokens) <= max_tokens:
+            return text, False, 100
+            
+        truncated_tokens = tokens[:max_tokens]
+        return (
+            self.enc.decode(truncated_tokens),
+            True,
+            100 * round(len(truncated_tokens)/len(tokens), 2)
+        )
+    
+    def process_content(self, content, max_tokens=None):
+        """
+        Process content with token counting and optional truncation.
+        
+        Returns:
+            tuple: (processed_content, token_info_dict)
+        """
+        original_tokens = self.count_tokens(content)
+        token_info = {
+            'original_tokens': original_tokens,
+            'was_truncated': False,
+            'final_tokens': original_tokens,
+            'truncation_percentage': 100
+        }
+        
+        if max_tokens:
+            content, was_truncated, truncation_percentage = self.truncate_text(content, max_tokens)
+            final_tokens = self.count_tokens(content)
+            token_info.update({
+                'was_truncated': was_truncated,
+                'final_tokens': final_tokens,
+                'truncation_percentage': truncation_percentage
+            })
+            
+        return content, token_info
+
+# Create a global instance for convenience
+token_manager = TokenManager()
 
 def should_exclude_path(path, base_path, excluded_dirs):
     """
@@ -130,13 +234,13 @@ def should_exclude_path(path, base_path, excluded_dirs):
     
     return False    
 
-def process_directory(url, output):
+def process_directory(url, output, excluded_exts=None):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     files = response.json()
 
     for file in files:
-        if file["type"] == "file" and is_allowed_filetype(file["name"]):
+        if file["type"] == "file" and is_allowed_filetype(file["name"], excluded_exts):
             print(f"Processing {file['path']}...")
 
             temp_file = f"temp_{file['name']}"
@@ -155,12 +259,12 @@ def process_directory(url, output):
             output.write("\n\n")
             os.remove(temp_file)
         elif file["type"] == "dir":
-            process_directory(file["url"], output)
+            process_directory(file["url"], output, excluded_exts)
 
-def process_local_directory(local_path, output):
+def process_local_directory(local_path, output, excluded_exts=None):
     for root, dirs, files in os.walk(local_path):
         for file in files:
-            if is_allowed_filetype(file):
+            if is_allowed_filetype(file, excluded_exts):
                 print(f"Processing {os.path.join(root, file)}...")
 
                 output.write(f"# {'-' * 3}\n")
@@ -177,7 +281,7 @@ def process_local_directory(local_path, output):
 
                 output.write("\n\n")
 
-def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None):
+def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
     api_base_url = "https://api.github.com/repos/"
     repo_url_parts = repo_url.split("https://github.com/")[-1].split("/")
     repo_name = "/".join(repo_url_parts[:2])
@@ -192,7 +296,7 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None):
 
     repo_content = [f'<source type="github_repository" url="{repo_url}">']
 
-    def process_directory(url, repo_content, max_tokens=None):
+    def process_directory(url, repo_content, max_tokens=None, excluded_exts=None):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         files = response.json()
@@ -203,7 +307,7 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None):
                 print(f"Skipping excluded directory: {file['path']}")
                 continue
                 
-            if file["type"] == "file" and is_allowed_filetype(file["name"]):
+            if file["type"] == "file" and is_allowed_filetype(file["name"], excluded_exts):
                 # Skip files in excluded directories
                 if excluded_dirs and should_exclude_path(file["path"], "", excluded_dirs):
                     print(f"Skipping file in excluded directory: {file['path']}")
@@ -222,31 +326,28 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None):
                     with open(temp_file, "r", encoding='utf-8', errors='ignore') as f:
                         file_content = f.read()
 
-                # Truncate content if needed
-                if max_tokens:
-                    file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
-                    
-                    # Get token count for this file
-                    file_token_count = get_token_count(file_content)
-                    if was_truncated:
-                        print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
-                        repo_content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
-                    else:
-                        print(f"Token count: {file_token_count}")
+                # Process content with token management
+                file_content, token_info = token_manager.process_content(file_content, max_tokens)
+                
+                if token_info['was_truncated']:
+                    print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+                    repo_content.append(f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->')
+                else:
+                    print(f"Token count: {token_info['final_tokens']}")
 
                 repo_content.append(escape_xml(file_content))
                 repo_content.append('</file>')
                 os.remove(temp_file)
             elif file["type"] == "dir":
-                process_directory(file["url"], repo_content, max_tokens)
+                process_directory(file["url"], repo_content, max_tokens, excluded_exts)
 
-    process_directory(contents_url, repo_content, max_tokens)
+    process_directory(contents_url, repo_content, max_tokens, excluded_exts)
     repo_content.append('</source>')
     print("All files processed.")
 
     return "\n".join(repo_content)
 
-def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
+def process_local_folder(local_path, max_tokens=None, excluded_dirs=None, excluded_exts=None):
     """Process a local directory and its files"""
     content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
     excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
@@ -262,7 +363,7 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
             continue
             
         for file in files:
-            if is_allowed_filetype(file):
+            if is_allowed_filetype(file, excluded_exts):
                 file_path = os.path.join(root, file)
                 if should_exclude_path(file_path, local_path, excluded_dirs):
                     continue
@@ -278,17 +379,14 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None):
                     with open(file_path, "r", encoding='utf-8', errors='ignore') as f:
                         file_content = f.read()
                 
-                # Truncate content if needed
-                if max_tokens:
-                    file_content, was_truncated, truncation_percentage = truncate_text_to_tokens(file_content, max_tokens)
-                    
-                    # Get token count for this file
-                    file_token_count = get_token_count(file_content)
-                    if was_truncated:
-                        print(f"Token count: {file_token_count} (truncated from larger file, {truncation_percentage}%)")
-                        content.append(f'<!-- Content truncated to {max_tokens} tokens -->')
-                    else:
-                        print(f"Token count: {file_token_count}")
+                # Process content with token management
+                file_content, token_info = token_manager.process_content(file_content, max_tokens)
+                
+                if token_info['was_truncated']:
+                    print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+                    content.append(f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->')
+                else:
+                    print(f"Token count: {token_info['final_tokens']}")
 
                 content.append(escape_xml(file_content))
                 content.append('</file>')
@@ -313,21 +411,16 @@ def process_arxiv_pdf(arxiv_abs_url, max_tokens=None):
 
     content = ' '.join(text)
     
-    # Truncate content if needed
-    if max_tokens:
-        content, was_truncated, truncation_percentage = truncate_text_to_tokens(content, max_tokens)
-        
-        # Get token count
-        token_count = get_token_count(content)
-        if was_truncated:
-            print(f"Token count: {token_count} (truncated from larger file, {truncation_percentage}%)")
-        else:
-            print(f"Token count: {token_count}")
+    # Process content with token management
+    content, token_info = token_manager.process_content(content, max_tokens)
 
     formatted_text = f'<source type="arxiv_paper" url="{escape_xml(arxiv_abs_url)}">\n'
     formatted_text += '<paper>\n'
-    if max_tokens and was_truncated:
-        formatted_text += f'<!-- Content truncated to {max_tokens} tokens -->\n'
+    if token_info['was_truncated']:
+        print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+        formatted_text += f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->\n'
+    else:
+        print(f"Token count: {token_info['final_tokens']}")
     formatted_text += escape_xml(content)
     formatted_text += '\n</paper>\n'
     formatted_text += '</source>'
@@ -365,18 +458,19 @@ def fetch_youtube_transcript(url, max_tokens=None):
         formatter = TextFormatter()
         transcript = formatter.format_transcript(transcript_list)
         
-        # Apply token truncation if max_tokens specified
-        original_tokens = count_tokens(transcript)
-        if max_tokens:
-            transcript = truncate_text_to_tokens(transcript, max_tokens)
-            truncated_tokens = count_tokens(transcript)
-            print(f"YouTube transcript tokens: {truncated_tokens}/{original_tokens}")
+        # Process content with token management
+        transcript, token_info = token_manager.process_content(transcript, max_tokens)
         
         formatted_text = f'<source type="youtube_transcript" url="{escape_xml(url)}">\n'
         formatted_text += '<transcript>\n'
         formatted_text += escape_xml(transcript)
-        if max_tokens and truncated_tokens < original_tokens:
-            formatted_text += f'\n<!-- Truncated from {original_tokens} to {truncated_tokens} tokens -->'
+        
+        if token_info['was_truncated']:
+            print(f"YouTube transcript tokens: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+            formatted_text += f'\n<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->'
+        else:
+            print(f"YouTube transcript tokens: {token_info['final_tokens']}")
+            
         formatted_text += '\n</transcript>\n'
         formatted_text += '</source>'
         
@@ -390,7 +484,6 @@ def preprocess_text(input_file, output_file):
 
     def process_text(text):
         text = re.sub(r"[\n\r]+", "\n", text)
-        # Update the following line to include apostrophes and quotation marks
         text = re.sub(r"[^a-zA-Z0-9\s_.,!?:;@#$%^&*()+\-=[\]{}|\\<>`~'\"/]+", "", text)
         text = re.sub(r"\s+", " ", text)
         text = text.lower()
@@ -419,13 +512,6 @@ def preprocess_text(input_file, output_file):
         with open(output_file, "w", encoding="utf-8") as out_file:
             out_file.write(processed_text)
         print("XML parsing failed. Text preprocessing completed without XML structure.")
-
-def get_token_count(text, disallowed_special=[], chunk_size=DEFAULT_CHUNK_SIZE):
-    """Count tokens in text"""
-    enc = tiktoken.get_encoding(DEFAULT_ENCODING)
-    text_without_tags = re.sub(r'<[^>]+>', '', text)
-    chunks = [text_without_tags[i:i+chunk_size] for i in range(0, len(text_without_tags), chunk_size)]
-    return sum(len(enc.encode(chunk, disallowed_special=disallowed_special)) for chunk in chunks)
 
 def is_same_domain(base_url, new_url):
     return urlparse(base_url).netloc == urlparse(new_url).netloc
@@ -477,22 +563,34 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs, max_
                 if clean_url.endswith('.pdf') and include_pdfs:
                     text = process_pdf(clean_url, max_tokens=max_tokens)
                 else:
+                    # Remove script, style, etc.
                     for element in soup(['script', 'style', 'head', 'title', 'meta', '[document]']):
                         element.decompose()
+                    
+                    # Remove comments
                     comments = soup.find_all(string=lambda text: isinstance(text, Comment))
                     for comment in comments:
                         comment.extract()
-                    text = soup.get_text(separator='\n', strip=True)
                     
-                    # Apply token truncation
-                    original_tokens = count_tokens(text)
-                    text = truncate_text_to_tokens(text, max_tokens)
-                    final_tokens = count_tokens(text)
-                    print(f"URL: {clean_url} - Tokens: {final_tokens}/{original_tokens}")
+                    # Remove base64 images
+                    for img in soup.find_all('img'):
+                        if img.get('src', '').startswith('data:image'):
+                            img.replace_with('[BASE64_IMAGE_REMOVED]')
+                    
+                    text = soup.get_text(separator='\n', strip=True)
+                    # Clean any remaining base64 content
+                    text = remove_base64_content(text)
+                    
+                # Process content with token management
+                text, token_info = token_manager.process_content(text, max_tokens)
 
                 all_text.append(f'<page url="{escape_xml(clean_url)}">')
-                if final_tokens < original_tokens:
-                    all_text.append(f'<!-- Content truncated from {original_tokens} to {final_tokens} tokens -->')
+                if token_info['was_truncated']:
+                    print(f"URL: {clean_url} - Tokens: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+                    all_text.append(f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->')
+                else:
+                    print(f"URL: {clean_url} - Tokens: {token_info['final_tokens']}")
+
                 all_text.append(escape_xml(text))
                 all_text.append('</page>')
                 processed_urls.append(clean_url)
@@ -555,8 +653,16 @@ def process_doi_or_pmid(identifier, max_tokens=None):
             for page in range(len(pdf_reader.pages)):
                 text += pdf_reader.pages[page].extract_text()
 
+        # Process content with token management
+        text, token_info = token_manager.process_content(text, max_tokens)
+
         formatted_text = f'<source type="sci_hub_paper" identifier="{escape_xml(identifier)}">\n'
         formatted_text += '<paper>\n'
+        if token_info['was_truncated']:
+            print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
+            formatted_text += f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->\n'
+        else:
+            print(f"Token count: {token_info['final_tokens']}")
         formatted_text += escape_xml(text)
         formatted_text += '\n</paper>\n'
         formatted_text += '</source>'
@@ -572,7 +678,7 @@ def process_doi_or_pmid(identifier, max_tokens=None):
         print("Sci-hub appears to be inaccessible or the document was not found. Please try again later.")
         return error_text
         
-def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens=None):
+def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
     url_parts = pull_request_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -588,7 +694,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     diff_response = requests.get(diff_url, headers=headers)
     pull_request_diff = diff_response.text
 
-    diff_tokens = count_tokens(pull_request_diff)
+    diff_tokens = token_manager.count_tokens(pull_request_diff)
     if max_tokens:
         pull_request_diff = truncate_text_to_tokens(pull_request_diff, max_tokens // 2)
         print(f"PR diff tokens: {diff_tokens} (truncated to {max_tokens // 2})")
@@ -608,7 +714,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     formatted_text += f'<title>{escape_xml(pull_request_data["title"])}</title>\n'
     
     description = pull_request_data["body"]
-    desc_tokens = count_tokens(description)
+    desc_tokens = token_manager.count_tokens(description)
     if max_tokens:
         description = truncate_text_to_tokens(description, max_tokens // 4)
         if desc_tokens > max_tokens // 4:
@@ -646,8 +752,8 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     formatted_text += '</pull_request_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    remaining_tokens = max_tokens - count_tokens(formatted_text) if max_tokens else None
-    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=remaining_tokens)
+    remaining_tokens = max_tokens - token_manager.count_tokens(formatted_text) if max_tokens else None
+    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=remaining_tokens, excluded_exts=excluded_exts)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -658,7 +764,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
 
     return formatted_text
     
-def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None):
+def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
     url_parts = issue_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -708,7 +814,7 @@ def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None):
     formatted_text += '</issue_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=max_tokens)
+    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=max_tokens, excluded_exts=excluded_exts)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content

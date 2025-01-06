@@ -132,7 +132,7 @@ git clone https://github.com/jimmc414/1filellm.git
 cd 1filellm
 
 # Create and activate a virtual environment (optional but recommended)
-python -m venv .venv
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install the package in editable mode
