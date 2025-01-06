@@ -12,3 +12,4 @@ wget>=3.2
 tqdm>=4.66.0
 rich>=13.6.0
 lxml>=4.9.0
+pytest

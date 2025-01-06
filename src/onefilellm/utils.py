@@ -716,7 +716,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
 
     diff_tokens = token_manager.count_tokens(pull_request_diff)
     if max_tokens:
-        pull_request_diff = truncate_text_to_tokens(pull_request_diff, max_tokens // 2)
+        pull_request_diff, _ = token_manager.truncate_text(pull_request_diff, max_tokens // 2)
         print(f"PR diff tokens: {diff_tokens} (truncated to {max_tokens // 2})")
     
     comments_url = pull_request_data["comments_url"]
@@ -736,7 +736,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     description = pull_request_data["body"]
     desc_tokens = token_manager.count_tokens(description)
     if max_tokens:
-        description = truncate_text_to_tokens(description, max_tokens // 4)
+        description, _ = token_manager.truncate_text(description, max_tokens // 4)
         if desc_tokens > max_tokens // 4:
             formatted_text += f'<description truncated="true" original_tokens="{desc_tokens}">'
         else:
@@ -749,7 +749,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     formatted_text += f'{escape_xml(pull_request_data["user"]["login"])} wants to merge {pull_request_data["commits"]} commit into {repo_owner}:{pull_request_data["base"]["ref"]} from {pull_request_data["head"]["label"]}\n'
     formatted_text += '</merge_details>\n'
     
-    if diff_tokens > max_tokens // 2:
+    if max_tokens and diff_tokens > max_tokens // 2:
         formatted_text += f'<diff_and_comments truncated="true" original_tokens="{diff_tokens}">\n'
     else:
         formatted_text += '<diff_and_comments>\n'

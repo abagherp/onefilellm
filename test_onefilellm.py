@@ -14,7 +14,7 @@ class TestDataAggregation(unittest.TestCase):
     def test_github_repo(self):
         print("\nTesting GitHub repository processing...")
         repo_url = "https://github.com/jimmc414/onefilellm"
-        repo_content = process_github_repo(repo_url)
+        repo_content, _ = process_github_repo(repo_url)
         self.assertIsInstance(repo_content, str)
         self.assertGreater(len(repo_content), 0)
         self.assertIn('<source type="github_repository"', repo_content)
@@ -32,7 +32,7 @@ class TestDataAggregation(unittest.TestCase):
     def test_local_folder(self):
         print("\nTesting local folder processing...")
         local_path = os.path.dirname(os.path.abspath(__file__))  # Use the directory of the test file
-        local_content = process_local_folder(local_path)
+        local_content, _ = process_local_folder(local_path)
         self.assertIsInstance(local_content, str)
         self.assertGreater(len(local_content), 0)
         self.assertIn('<source type="local_directory"', local_content)
@@ -83,7 +83,7 @@ class TestDataAggregation(unittest.TestCase):
     def test_process_github_pull_request(self):
         print("\nTesting GitHub pull request processing...")
         pull_request_url = "https://github.com/dear-github/dear-github/pull/102"
-        pull_request_content = process_github_pull_request(pull_request_url)
+        pull_request_content, _ = process_github_pull_request(pull_request_url)
         self.assertIsInstance(pull_request_content, str)
         self.assertGreater(len(pull_request_content), 0)
         self.assertIn('<source type="github_pull_request"', pull_request_content)
@@ -94,7 +94,7 @@ class TestDataAggregation(unittest.TestCase):
     def test_process_github_issue(self):
         print("\nTesting GitHub issue processing...")
         issue_url = "https://github.com/isaacs/github/issues/1191"
-        issue_content = process_github_issue(issue_url)
+        issue_content, _ = process_github_issue(issue_url)
         self.assertIsInstance(issue_content, str)
         self.assertGreater(len(issue_content), 0)
         self.assertIn('<source type="github_issue"', issue_content)
