@@ -15,6 +15,7 @@ def main():
     parser.add_argument('--max-tokens', '-m', type=int, help='Maximum number of tokens per file')
     parser.add_argument('--output-dir', '-o', help='Directory to store output files')
     parser.add_argument('--exclude-ext', '-x', action='append', help='File extensions to exclude (can be used multiple times, e.g., -x .js -x .py)')
+    parser.add_argument('--max-depth', '-d', type=int, default=2, help='Maximum depth for URL crawling (default: 2)')
     
     args = parser.parse_args()
     input_path = args.input_path
@@ -22,6 +23,7 @@ def main():
     max_tokens = args.max_tokens
     output_dir = args.output_dir
     excluded_exts = set(args.exclude_ext) if args.exclude_ext else set()
+    max_depth = args.max_depth
 
     if not input_path:
         intro_text = Text("\nInput Paths or URLs Processed:\n", style="dodger_blue1")
@@ -54,7 +56,7 @@ def main():
     working_dir = os.getcwd()
     
     try:
-        process_input(input_path, working_dir, console, excluded_dirs, max_tokens, output_dir, excluded_exts)
+        process_input(input_path, working_dir, console, excluded_dirs, max_tokens, output_dir, excluded_exts, max_depth)
     except Exception as e:
         console.print(f"\n[bold red]An error occurred:[/bold red] {str(e)}")
         console.print("\nPlease check your input and try again.")

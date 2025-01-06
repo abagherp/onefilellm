@@ -24,7 +24,7 @@ if TOKEN == 'default_token_here':
 
 headers = {"Authorization": f"token {TOKEN}"}
 
-def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None, output_dir=None, excluded_exts=None):
+def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None, output_dir=None, excluded_exts=None, max_depth=2):
     """
     Process the input and generate output files
     
@@ -36,6 +36,7 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
         max_tokens: Maximum number of tokens per file
         output_dir: Optional directory to store output files
         excluded_exts: Set of file extensions to exclude
+        max_depth: Maximum depth for URL crawling (default: 2)
     """
     # Initialize token counter per extension
     extension_tokens = {}
@@ -80,7 +81,7 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
                 elif "arxiv.org" in input_path:
                     final_output = process_arxiv_pdf(input_path, max_tokens)
                 else:
-                    crawl_result = crawl_and_extract_text(input_path, max_depth=2, include_pdfs=True, ignore_epubs=True, max_tokens=max_tokens)
+                    crawl_result = crawl_and_extract_text(input_path, max_depth=max_depth, include_pdfs=True, ignore_epubs=True, max_tokens=max_tokens)
                     final_output = crawl_result['content']
                     with open(urls_list_file, 'w', encoding='utf-8') as urls_file:
                         urls_file.write('\n'.join(crawl_result['processed_urls']))
