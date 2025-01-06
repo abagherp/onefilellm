@@ -25,6 +25,12 @@ from .constants import (
 
 DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
 
+def get_github_headers():
+    """Get GitHub API headers with token if available"""
+    token = os.getenv('GITHUB_TOKEN')
+    if not token:
+        raise EnvironmentError("GITHUB_TOKEN environment variable not set. This is required for GitHub operations.")
+    return {"Authorization": f"token {token}"}
 
 def safe_file_read(filepath, fallback_encoding='latin1'):
     """Safely read a file with UTF-8 encoding, falling back to latin1"""
@@ -38,13 +44,8 @@ def safe_file_read(filepath, fallback_encoding='latin1'):
 nltk.download("stopwords", quiet=True)
 stop_words = set(stopwords.words("english"))
 
-TOKEN = os.getenv('GITHUB_TOKEN', 'default_token_here')
-if TOKEN == 'default_token_here':
-    raise EnvironmentError("GITHUB_TOKEN environment variable not set.")
-
-headers = {"Authorization": f"token {TOKEN}"}
-
-def download_file(url, target_path):
+def download_file(url, target_path, headers=None):
+    """Download a file from URL to target path"""
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     with open(target_path, "wb") as f:
@@ -282,6 +283,11 @@ def process_local_directory(local_path, output, excluded_exts=None):
                 output.write("\n\n")
 
 def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
+    try:
+        headers = get_github_headers()
+    except EnvironmentError as e:
+        raise EnvironmentError(f"Cannot process GitHub repository: {str(e)}")
+
     api_base_url = "https://api.github.com/repos/"
     repo_url_parts = repo_url.split("https://github.com/")[-1].split("/")
     repo_name = "/".join(repo_url_parts[:2])
@@ -679,6 +685,11 @@ def process_doi_or_pmid(identifier, max_tokens=None):
         return error_text
         
 def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
+    try:
+        headers = get_github_headers()
+    except EnvironmentError as e:
+        raise EnvironmentError(f"Cannot process GitHub pull request: {str(e)}")
+
     url_parts = pull_request_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
@@ -765,6 +776,11 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     return formatted_text
     
 def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
+    try:
+        headers = get_github_headers()
+    except EnvironmentError as e:
+        raise EnvironmentError(f"Cannot process GitHub issue: {str(e)}")
+
     url_parts = issue_url.split("/")
     repo_owner = url_parts[3]
     repo_name = url_parts[4]
