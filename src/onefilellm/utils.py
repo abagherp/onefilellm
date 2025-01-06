@@ -301,6 +301,7 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
         contents_url = f"{contents_url}/{subdirectory}"
 
     repo_content = [f'<source type="github_repository" url="{repo_url}">']
+    extension_tokens = {}
 
     def process_directory(url, repo_content, max_tokens=None, excluded_exts=None):
         response = requests.get(url, headers=headers)
@@ -322,7 +323,7 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
                 print(f"Processing {file['path']}...")
 
                 temp_file = f"temp_{file['name']}"
-                download_file(file["download_url"], temp_file)
+                download_file(file["download_url"], temp_file, headers)
 
                 repo_content.append(f'<file name="{escape_xml(file["path"])}">') 
 
@@ -334,6 +335,10 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
 
                 # Process content with token management
                 file_content, token_info = token_manager.process_content(file_content, max_tokens)
+                
+                # Track tokens by extension
+                _, ext = os.path.splitext(file["name"])
+                extension_tokens[ext] = extension_tokens.get(ext, 0) + token_info['final_tokens']
                 
                 if token_info['was_truncated']:
                     print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
@@ -351,12 +356,13 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
     repo_content.append('</source>')
     print("All files processed.")
 
-    return "\n".join(repo_content)
+    return "\n".join(repo_content), extension_tokens
 
 def process_local_folder(local_path, max_tokens=None, excluded_dirs=None, excluded_exts=None):
     """Process a local directory and its files"""
     content = [f'<source type="local_directory" path="{escape_xml(local_path)}">']
     excluded_dirs = set(excluded_dirs or []).union(DEFAULT_EXCLUDED_DIRS)
+    extension_tokens = {}
     
     for root, dirs, files in os.walk(local_path):
         dirs[:] = [d for d in dirs if not should_exclude_path(
@@ -388,6 +394,10 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None, exclud
                 # Process content with token management
                 file_content, token_info = token_manager.process_content(file_content, max_tokens)
                 
+                # Track tokens by extension
+                _, ext = os.path.splitext(file)
+                extension_tokens[ext] = extension_tokens.get(ext, 0) + token_info['final_tokens']
+                
                 if token_info['was_truncated']:
                     print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
                     content.append(f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->')
@@ -399,7 +409,7 @@ def process_local_folder(local_path, max_tokens=None, excluded_dirs=None, exclud
 
     content.append('</source>')
     print("All files processed.")
-    return '\n'.join(content)
+    return '\n'.join(content), extension_tokens
 
 def process_arxiv_pdf(arxiv_abs_url, max_tokens=None):
     pdf_url = arxiv_abs_url.replace("/abs/", "/pdf/") + ".pdf"
@@ -696,7 +706,6 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
     pull_request_number = url_parts[-1]
 
     api_base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pull_request_number}"
-    headers = {"Authorization": f"token {TOKEN}"}
 
     response = requests.get(api_base_url, headers=headers)
     pull_request_data = response.json()
@@ -764,7 +773,7 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
     remaining_tokens = max_tokens - token_manager.count_tokens(formatted_text) if max_tokens else None
-    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=remaining_tokens, excluded_exts=excluded_exts)
+    repo_content, extension_tokens = process_github_repo(repo_url, excluded_dirs, max_tokens=remaining_tokens, excluded_exts=excluded_exts)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -773,8 +782,8 @@ def process_github_pull_request(pull_request_url, excluded_dirs=None, max_tokens
 
     print(f"Pull request {pull_request_number} and repository content processed successfully.")
 
-    return formatted_text
-    
+    return formatted_text, extension_tokens
+
 def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, excluded_exts=None):
     try:
         headers = get_github_headers()
@@ -787,7 +796,6 @@ def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, exclude
     issue_number = url_parts[-1]
 
     api_base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues/{issue_number}"
-    headers = {"Authorization": f"token {TOKEN}"}
 
     response = requests.get(api_base_url, headers=headers)
     issue_data = response.json()
@@ -830,7 +838,7 @@ def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, exclude
     formatted_text += '</issue_info>\n'
 
     repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    repo_content = process_github_repo(repo_url, excluded_dirs, max_tokens=max_tokens, excluded_exts=excluded_exts)
+    repo_content, extension_tokens = process_github_repo(repo_url, excluded_dirs, max_tokens=max_tokens, excluded_exts=excluded_exts)
     
     formatted_text += '<repository>\n'
     formatted_text += repo_content
@@ -839,7 +847,7 @@ def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, exclude
 
     print(f"Issue {issue_number} and repository content processed successfully.")
 
-    return formatted_text
+    return formatted_text, extension_tokens
 
 def get_source_name(input_path):
     """Generate a name for the output files based on the input source"""

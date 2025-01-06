@@ -37,6 +37,10 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
         output_dir: Optional directory to store output files
         excluded_exts: Set of file extensions to exclude
     """
+    # Initialize token counter per extension
+    extension_tokens = {}
+    total_tokens = 0
+    
     # Generate source name for output files
     source_name = get_source_name(input_path)
     
@@ -65,11 +69,11 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
         try:
             if "github.com" in input_path:
                 if "/pull/" in input_path:
-                    final_output = process_github_pull_request(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
+                    final_output, extension_tokens = process_github_pull_request(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
                 elif "/issues/" in input_path:
-                    final_output = process_github_issue(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
+                    final_output, extension_tokens = process_github_issue(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
                 else:
-                    final_output = process_github_repo(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
+                    final_output, extension_tokens = process_github_repo(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
             elif urlparse(input_path).scheme in ["http", "https"]:
                 if "youtube.com" in input_path or "youtu.be" in input_path:
                     final_output = fetch_youtube_transcript(input_path, max_tokens)
@@ -83,7 +87,7 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
             elif input_path.startswith("10.") and "/" in input_path or input_path.isdigit():
                 final_output = process_doi_or_pmid(input_path, max_tokens)
             else:
-                final_output = process_local_folder(input_path, max_tokens, custom_excluded_dirs, excluded_exts)
+                final_output, extension_tokens = process_local_folder(input_path, max_tokens, custom_excluded_dirs, excluded_exts)
 
             progress.update(task, advance=50)
 
@@ -104,6 +108,16 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
             uncompressed_text = safe_file_read(output_file)
             uncompressed_token_count = token_manager.count_tokens(uncompressed_text)
             console.print(f"[bright_green]Uncompressed Token Count:[/bright_green] [bold bright_cyan]{uncompressed_token_count}[/bold bright_cyan]")
+
+            # Display extension summary if we have extension data
+            if extension_tokens:
+                total_tokens = sum(extension_tokens.values())
+                console.print("\n[bold bright_green]Token Summary by Extension:[/bold bright_green]")
+                # Sort extensions by token count in descending order
+                sorted_extensions = sorted(extension_tokens.items(), key=lambda x: x[1], reverse=True)
+                for ext, tokens in sorted_extensions:
+                    percentage = (tokens / total_tokens) * 100
+                    console.print(f"[bright_white]{ext}:[/bright_white] [bold bright_cyan]{tokens:,}[/bold bright_cyan] tokens ([bold bright_yellow]{percentage:.1f}%[/bold bright_yellow])")
 
             console.print(f"\n[bold bright_yellow]{processed_file}[/bold bright_yellow] and [bold bright_blue]{output_file}[/bold bright_blue] have been created in {output_dir}")
 
