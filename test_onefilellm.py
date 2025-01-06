@@ -102,5 +102,46 @@ class TestDataAggregation(unittest.TestCase):
         self.assertIn('<repository>', issue_content)
         print("GitHub issue processing test passed.")
 
+    def test_token_count_consistency(self):
+        print("\nTesting token count consistency...")
+        # Process a local folder to get both extension tokens and total counts
+        repo_url = "https://github.com/yunshun/HumanBreast10X" 
+        content, extension_tokens = process_github_repo(repo_url)
+        
+        # Calculate total tokens from extensions (excluding XML overhead)
+        content_tokens = sum(tokens for ext, tokens in extension_tokens.items() if ext != '.xml')
+        xml_overhead_tokens = extension_tokens.get('.xml', 0)
+        total_extension_tokens = content_tokens + xml_overhead_tokens
+        
+        # Get uncompressed count
+        from onefilellm.utils import token_manager
+        uncompressed_count = token_manager.count_tokens(content)
+        
+        # Calculate XML overhead percentage
+        xml_overhead_percentage = (xml_overhead_tokens / total_extension_tokens) * 100 if total_extension_tokens > 0 else 0
+        
+        print(f"\nToken count analysis:")
+        print("Extension tokens by type:", extension_tokens)
+        print(f"Content tokens (excluding XML): {content_tokens:,}")
+        print(f"XML overhead tokens: {xml_overhead_tokens:,}")
+        print(f"Total tokens: {total_extension_tokens:,}")
+        print(f"Uncompressed count: {uncompressed_count:,}")
+        print(f"XML overhead: {xml_overhead_percentage:.1f}%")
+        
+        # The XML overhead should be reasonable (typically less than 25%)
+        self.assertLess(xml_overhead_percentage, 10, 
+                       "XML overhead is unusually high (>10%), might indicate an issue")
+        
+        # The XML overhead should be at least 5% (if it's less, we might be missing tags)
+        self.assertGreater(xml_overhead_percentage, 1,
+                          "XML overhead is unusually low (<1%), might be missing XML tags")
+        
+        # The total tokens should match the uncompressed count within a small margin
+        token_diff_percentage = abs(total_extension_tokens - uncompressed_count) / total_extension_tokens * 100
+        self.assertLess(token_diff_percentage, 1,
+                       f"Token count mismatch: {token_diff_percentage:.1f}% difference between total tokens and uncompressed count")
+        
+        print("Token count consistency test passed.")
+
 if __name__ == "__main__":
     unittest.main()

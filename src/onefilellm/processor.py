@@ -7,10 +7,19 @@ import pyperclip
 import xml.etree.ElementTree as ET
 from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 
-from onefilellm.utils import (
-    process_github_pull_request, process_github_issue, process_github_repo, fetch_youtube_transcript, process_arxiv_pdf, 
-    crawl_and_extract_text, process_doi_or_pmid, escape_xml, should_exclude_path, is_allowed_filetype, 
-    process_ipynb_file, preprocess_text, safe_file_read, process_local_folder, token_manager
+from .utils import (
+    process_github_repo,
+    process_github_pull_request,
+    process_github_issue,
+    process_arxiv_pdf,
+    process_local_folder,
+    fetch_youtube_transcript,
+    crawl_and_extract_text,
+    process_doi_or_pmid,
+    preprocess_text,
+    safe_file_read,
+    token_manager,
+    get_source_name
 )
 
 # Download NLTK data and initialize stop words
@@ -129,13 +138,3 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
             console.print(f"\n[bold red]An error occurred:[/bold red] {str(e)}")
             console.print("\nPlease check your input and try again.")
             raise
-
-def get_source_name(input_path):
-    """Generate a name for the output files based on the input source"""
-    if "github.com" in input_path:
-        parts = input_path.split("github.com/")[-1].split("/")
-        if len(parts) >= 2:
-            return f"{parts[0]}_{parts[1]}"
-    elif os.path.isdir(input_path):
-        return os.path.basename(input_path)
-    return "output"

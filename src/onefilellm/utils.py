@@ -22,6 +22,7 @@ from .constants import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_ENCODING
 )
+import time
 
 DEFAULT_EXCLUDED_DIRS = {'.venv', '__pycache__', '.git', 'node_modules', '.pytest_cache', '.idea', '.vs', '.next'}
 
@@ -141,11 +142,15 @@ class TokenManager:
         self.disallowed_special = ()
     
     def count_tokens(self, text, disallowed_special=None):
-        """Count tokens in text, removing XML tags first."""
-        text_without_tags = re.sub(r'<[^>]+>', '', text)
-        chunks = [text_without_tags[i:i+self.chunk_size] for i in range(0, len(text_without_tags), self.chunk_size)]
+        """Count tokens in text."""
+        chunks = [text[i:i+self.chunk_size] for i in range(0, len(text), self.chunk_size)]
         disallowed = self.disallowed_special if disallowed_special is None else disallowed_special
         return sum(len(self.enc.encode(chunk, disallowed_special=disallowed)) for chunk in chunks)
+    
+    def count_xml_tokens(self, text):
+        """Count tokens in text, including XML tags."""
+        chunks = [text[i:i+self.chunk_size] for i in range(0, len(text), self.chunk_size)]
+        return sum(len(self.enc.encode(chunk, disallowed_special=self.disallowed_special)) for chunk in chunks)
     
     def truncate_text(self, text, max_tokens):
         """
@@ -300,10 +305,35 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
     if subdirectory:
         contents_url = f"{contents_url}/{subdirectory}"
 
-    repo_content = [f'<source type="github_repository" url="{repo_url}">']
-    extension_tokens = {}
+    # Get repository metadata
+    repo_api_url = f"{api_base_url}{repo_name}"
+    repo_response = requests.get(repo_api_url, headers=headers)
+    repo_data = repo_response.json()
 
-    def process_directory(url, repo_content, max_tokens=None, excluded_exts=None):
+    # Track XML overhead separately
+    xml_overhead = []
+    xml_overhead.append(f'<source type="github_repository" url="{repo_url}">')
+    xml_overhead.append('<repository_info>')
+    xml_overhead.append(f'<owner>{escape_xml(repo_url_parts[0])}</owner>')
+    xml_overhead.append(f'<name>{escape_xml(repo_url_parts[1])}</name>')
+    xml_overhead.append(f'<description>{escape_xml(repo_data.get("description", ""))}</description>')
+    xml_overhead.append(f'<default_branch>{escape_xml(repo_data.get("default_branch", ""))}</default_branch>')
+    xml_overhead.append(f'<created_at>{repo_data.get("created_at", "")}</created_at>')
+    xml_overhead.append(f'<updated_at>{repo_data.get("updated_at", "")}</updated_at>')
+    xml_overhead.append(f'<language>{escape_xml(repo_data.get("language", ""))}</language>')
+    xml_overhead.append(f'<stars>{repo_data.get("stargazers_count", 0)}</stars>')
+    xml_overhead.append(f'<forks>{repo_data.get("forks_count", 0)}</forks>')
+    xml_overhead.append(f'<open_issues>{repo_data.get("open_issues_count", 0)}</open_issues>')
+    if subdirectory:
+        xml_overhead.append(f'<subdirectory>{escape_xml(subdirectory)}</subdirectory>')
+    xml_overhead.append('</repository_info>')
+    xml_overhead.append('<files>')
+    
+    repo_content = []
+    extension_tokens = {}
+    file_stats = {'total_files': 0, 'total_size': 0, 'extensions': {}}
+
+    def process_directory(url, repo_content, xml_overhead, max_tokens=None, excluded_exts=None):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         files = response.json()
@@ -325,7 +355,20 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
                 temp_file = f"temp_{file['name']}"
                 download_file(file["download_url"], temp_file, headers)
 
-                repo_content.append(f'<file name="{escape_xml(file["path"])}">') 
+                # Update file statistics
+                file_stats['total_files'] += 1
+                file_stats['total_size'] += file["size"]
+                _, ext = os.path.splitext(file["name"])
+                file_stats['extensions'][ext] = file_stats['extensions'].get(ext, 0) + 1
+
+                # Add XML tags with more metadata
+                xml_overhead.append('<file>')
+                xml_overhead.append(f'<path>{escape_xml(file["path"])}</path>')
+                xml_overhead.append(f'<name>{escape_xml(file["name"])}</name>')
+                xml_overhead.append(f'<size>{file["size"]}</size>')
+                xml_overhead.append(f'<sha>{file["sha"]}</sha>')
+                xml_overhead.append(f'<download_url>{escape_xml(file["download_url"])}</download_url>')
+                xml_overhead.append('<content>')
 
                 if file["name"].endswith(".ipynb"):
                     file_content = process_ipynb_file(temp_file)
@@ -335,28 +378,75 @@ def process_github_repo(repo_url, excluded_dirs=None, max_tokens=None, excluded_
 
                 # Process content with token management
                 file_content, token_info = token_manager.process_content(file_content, max_tokens)
-                
+
                 # Track tokens by extension
-                _, ext = os.path.splitext(file["name"])
                 extension_tokens[ext] = extension_tokens.get(ext, 0) + token_info['final_tokens']
                 
                 if token_info['was_truncated']:
                     print(f"Token count: {token_info['final_tokens']} (truncated from {token_info['original_tokens']}, {token_info['truncation_percentage']}%)")
-                    repo_content.append(f'<!-- Content truncated from {token_info["original_tokens"]} to {token_info["final_tokens"]} tokens ({token_info["truncation_percentage"]}%) -->')
+                    # Add token info in XML
+                    xml_overhead.append(f'<token_info original="{token_info["original_tokens"]}" final="{token_info["final_tokens"]}" truncated="{token_info["truncation_percentage"]}%"/>')
                 else:
                     print(f"Token count: {token_info['final_tokens']}")
+                    xml_overhead.append(f'<token_info count="{token_info["final_tokens"]}"/>')
 
-                repo_content.append(escape_xml(file_content))
-                repo_content.append('</file>')
+                repo_content.append(file_content)
+                xml_overhead.append('</content>')
+                xml_overhead.append('</file>')
                 os.remove(temp_file)
             elif file["type"] == "dir":
-                process_directory(file["url"], repo_content, max_tokens, excluded_exts)
+                process_directory(file["url"], repo_content, xml_overhead, max_tokens, excluded_exts)
 
-    process_directory(contents_url, repo_content, max_tokens, excluded_exts)
-    repo_content.append('</source>')
+    process_directory(contents_url, repo_content, xml_overhead, max_tokens, excluded_exts)
+
+    # Add file statistics summary
+    xml_overhead.append('<file_statistics>')
+    xml_overhead.append(f'<total_files>{file_stats["total_files"]}</total_files>')
+    xml_overhead.append(f'<total_size>{file_stats["total_size"]}</total_size>')
+    xml_overhead.append('<extensions>')
+    for ext, count in file_stats['extensions'].items():
+        xml_overhead.append(f'<extension name="{escape_xml(ext)}" count="{count}"/>')
+    xml_overhead.append('</extensions>')
+    xml_overhead.append('</file_statistics>')
+    xml_overhead.append('</files>')
+    xml_overhead.append('</source>')
+    
+    # Calculate actual XML overhead tokens
+    xml_structure = "\n".join(xml_overhead)
+    xml_overhead_tokens = token_manager.count_xml_tokens(xml_structure)
+    
+    # Add XML overhead to extension tokens
+    extension_tokens['.xml'] = xml_overhead_tokens
+    
+    # Combine content with XML
+    final_content = []
+    xml_iter = iter(xml_overhead)
+    content_iter = iter(repo_content)
+    
+    # Add opening tags and repository info (13 tags)
+    for _ in range(13 + (1 if subdirectory else 0)):
+        final_content.append(next(xml_iter))
+    
+    # Add files tag
+    final_content.append(next(xml_iter))
+    
+    # Add each file with its XML wrapper
+    for _ in range(len(repo_content)):
+        # Add file metadata (7 tags)
+        for _ in range(7):
+            final_content.append(next(xml_iter))
+        # Add content
+        final_content.append(next(content_iter))
+        # Add token info and closing tags (3 tags)
+        for _ in range(3):
+            final_content.append(next(xml_iter))
+    
+    # Add file statistics (variable number of tags)
+    remaining_tags = list(xml_iter)
+    final_content.extend(remaining_tags)
+    
     print("All files processed.")
-
-    return "\n".join(repo_content), extension_tokens
+    return "\n".join(final_content), extension_tokens
 
 def process_local_folder(local_path, max_tokens=None, excluded_dirs=None, excluded_exts=None):
     """Process a local directory and its files"""
@@ -557,10 +647,11 @@ def process_pdf(url, max_tokens=None):
     os.remove('temp.pdf')
     return ' '.join(text)
 
-def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs, max_tokens=None):
+def crawl_and_extract_text(base_url, max_depth=2, include_pdfs=True, ignore_epubs=True, max_tokens=None):
     visited_urls = set()
     urls_to_visit = [(base_url, 0)]
     processed_urls = []
+    all_links = set()  # Track all discovered links
     all_text = [f'<source type="web_documentation" url="{escape_xml(base_url)}">']
 
     while urls_to_visit:
@@ -576,8 +667,20 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs, max_
                 soup = BeautifulSoup(response.content, 'html.parser')
                 visited_urls.add(clean_url)
 
+                # Collect all links regardless of depth
+                for link in soup.find_all('a', href=True):
+                    new_url = urljoin(current_url, link['href']).split('#')[0]
+                    if new_url not in all_links and is_same_domain(base_url, new_url):
+                        all_links.add(new_url)
+                        # Only add to urls_to_visit if within max_depth
+                        if current_depth < max_depth and new_url not in visited_urls:
+                            if (include_pdfs or not new_url.endswith('.pdf')) and not (ignore_epubs and new_url.endswith('.epub')):
+                                urls_to_visit.append((new_url, current_depth + 1))
+
                 if clean_url.endswith('.pdf') and include_pdfs:
-                    text = process_pdf(clean_url, max_tokens=max_tokens)
+                    # Create a unique temp file name for PDF
+                    temp_pdf = f"temp_pdf_{hash(clean_url)}_{int(time.time())}.pdf"
+                    text = process_pdf(clean_url, max_tokens=max_tokens, temp_file=temp_pdf)
                 else:
                     # Remove script, style, etc.
                     for element in soup(['script', 'style', 'head', 'title', 'meta', '[document]']):
@@ -612,21 +715,21 @@ def crawl_and_extract_text(base_url, max_depth, include_pdfs, ignore_epubs, max_
                 processed_urls.append(clean_url)
                 print(f"Processed: {clean_url}")
 
-                if current_depth < max_depth:
-                    for link in soup.find_all('a', href=True):
-                        new_url = urljoin(current_url, link['href']).split('#')[0]
-                        if new_url not in visited_urls and is_within_depth(base_url, new_url, max_depth) and (include_pdfs or not new_url.endswith('.pdf')) and not (ignore_epubs and new_url.endswith('.epub')):
-                            urls_to_visit.append((new_url, current_depth + 1))
-
             except requests.RequestException as e:
                 print(f"Failed to retrieve {clean_url}: {e}")
 
+    # Add discovered links section
+    all_text.append('<discovered_links>')
+    for url in sorted(all_links):
+        all_text.append(f'<link url="{escape_xml(url)}"/>')
+    all_text.append('</discovered_links>')
     all_text.append('</source>')
     formatted_content = '\n'.join(all_text)
 
     return {
         'content': formatted_content,
-        'processed_urls': processed_urls
+        'processed_urls': processed_urls,
+        'discovered_urls': list(all_links)  # Include all discovered links in the return value
     }
 
 def process_doi_or_pmid(identifier, max_tokens=None):
@@ -851,10 +954,49 @@ def process_github_issue(issue_url, excluded_dirs=None, max_tokens=None, exclude
 
 def get_source_name(input_path):
     """Generate a name for the output files based on the input source"""
+    from urllib.parse import urlparse
+
+    # GitHub URLs
     if "github.com" in input_path:
         parts = input_path.split("github.com/")[-1].split("/")
         if len(parts) >= 2:
+            if "/pull/" in input_path:
+                return f"{parts[0]}_{parts[1]}_pr{parts[-1]}"
+            elif "/issues/" in input_path:
+                return f"{parts[0]}_{parts[1]}_issue{parts[-1]}"
             return f"{parts[0]}_{parts[1]}"
-    elif os.path.isdir(input_path):
-        return os.path.basename(input_path)
+    
+    # Web URLs
+    parsed = urlparse(input_path)
+    if parsed.scheme in ["http", "https"]:
+        # YouTube
+        if "youtube.com" in input_path or "youtu.be" in input_path:
+            video_id = input_path.split("watch?v=")[-1].split("&")[0]
+            if "youtu.be" in input_path:
+                video_id = input_path.split("youtu.be/")[-1].split("?")[0]
+            return f"youtube_{video_id}"
+        # ArXiv
+        elif "arxiv.org" in input_path:
+            paper_id = input_path.split("/")[-1]
+            return f"arxiv_{paper_id}"
+        # Other web pages
+        else:
+            domain = parsed.netloc.replace("www.", "")
+            return f"web_{domain}"
+    
+    # DOI/PMID
+    elif input_path.startswith("10.") and "/" in input_path:
+        return f"doi_{input_path.replace('/', '_')}"
+    elif input_path.isdigit():
+        return f"pmid_{input_path}"
+    
+    # Local directory/file
+    elif os.path.exists(input_path):
+        if os.path.isdir(input_path):
+            return os.path.basename(input_path)
+        else:
+            base = os.path.splitext(os.path.basename(input_path))[0]
+            return base
+    
+    # Default case
     return "output"
