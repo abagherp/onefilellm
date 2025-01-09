@@ -1,5 +1,5 @@
-# 1FileLLM: Efficient Data Aggregation for LLM Ingestion
-1FileLLM is a command-line tool designed to streamline the creation of information-dense prompts for large language models (LLMs). It aggregates and preprocesses data from a variety of sources, compiling them into a single text file that is automatically copied to your clipboard for quick use.
+# OneFileLLM: Efficient Data Aggregation for LLM Ingestion
+OneFileLLM is a command-line tool designed to streamline the creation of information-dense prompts for large language models (LLMs). It aggregates and preprocesses data from a variety of sources, compiling them into a single text file that is automatically copied to your clipboard for quick use.
 
 ## Features
 
