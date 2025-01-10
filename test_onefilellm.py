@@ -38,6 +38,44 @@ class TestDataAggregation(unittest.TestCase):
         self.assertIn('<source type="local_directory"', local_content)
         print("Local folder processing test passed.")
 
+    def test_local_folder_without_github_token(self):
+        print("\nTesting local folder processing without GitHub token...")
+        # Store original token
+        original_token = os.environ.get('GITHUB_TOKEN')
+        
+        try:
+            # Remove GitHub token from environment
+            if 'GITHUB_TOKEN' in os.environ:
+                del os.environ['GITHUB_TOKEN']
+            
+            # Process a local folder
+            local_path = os.path.dirname(os.path.abspath(__file__))
+            from onefilellm.processor import process_input
+            from rich.console import Console
+            
+            # Create a test output directory
+            test_output_dir = os.path.join(self.temp_dir, "test_output")
+            os.makedirs(test_output_dir, exist_ok=True)
+            
+            # Process the local folder
+            process_input(
+                local_path,
+                os.getcwd(),
+                Console(),
+                output_dir=test_output_dir
+            )
+            
+            # Check that output files were created
+            output_base = os.path.join(test_output_dir, os.path.basename(local_path))
+            self.assertTrue(os.path.exists(f"{output_base}_uncompressed.txt"))
+            self.assertTrue(os.path.exists(f"{output_base}_compressed.txt"))
+            
+            print("Local folder processing without GitHub token test passed.")
+        finally:
+            # Restore original token
+            if original_token is not None:
+                os.environ['GITHUB_TOKEN'] = original_token
+
     def test_youtube_transcript(self):
         print("\nTesting YouTube transcript fetching...")
         video_url = "https://www.youtube.com/watch?v=KZ_NlnmPQYk"
