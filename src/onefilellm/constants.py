@@ -8,11 +8,12 @@ DEFAULT_EXCLUDED_DIRS = {
 
 # File types
 ALLOWED_EXTENSIONS = [
-    '.py', '.txt', '.js', '.tsx', '.ts', '.md', 
-    '.cjs', '.html', '.json', '.ipynb', '.h',
-    '.localhost', '.sh', '.yaml', '.example',
-    '.jsx', '.csv', '.R', '.Rmd'
+    '.cjs', '.csv', '.example', '.go', '.h', '.html',
+    '.ipynb', '.js', '.json', '.jsx', '.localhost',
+    '.md', '.mdx', '.pdf', '.py', '.r', '.rmd',
+    '.sh', '.ts', '.tsx', '.txt', '.yaml', '.yml'
 ]
+
 
 EXCLUDED_FILES = [
     'compressed_output.txt',
