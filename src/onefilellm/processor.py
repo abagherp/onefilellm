@@ -26,13 +26,6 @@ from .utils import (
 nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words("english"))
 
-# Constants
-TOKEN = os.getenv('GITHUB_TOKEN', 'default_token_here')
-if TOKEN == 'default_token_here':
-    raise EnvironmentError("GITHUB_TOKEN environment variable not set.")
-
-headers = {"Authorization": f"token {TOKEN}"}
-
 def process_input(input_path, working_dir, console, custom_excluded_dirs=None, max_tokens=None, output_dir=None, excluded_exts=None, max_depth=2):
     """
     Process the input and generate output files
@@ -78,6 +71,10 @@ def process_input(input_path, working_dir, console, custom_excluded_dirs=None, m
 
         try:
             if "github.com" in input_path:
+                # Check for GitHub token only when processing GitHub URLs
+                if not os.getenv('GITHUB_TOKEN'):
+                    raise EnvironmentError("GITHUB_TOKEN environment variable not set. This is required for GitHub operations.")
+                    
                 if "/pull/" in input_path:
                     final_output, extension_tokens = process_github_pull_request(input_path, custom_excluded_dirs, max_tokens, excluded_exts)
                 elif "/issues/" in input_path:

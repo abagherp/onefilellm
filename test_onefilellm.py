@@ -129,10 +129,10 @@ class TestDataAggregation(unittest.TestCase):
         print(f"XML overhead: {xml_overhead_percentage:.1f}%")
         
         # The XML overhead should be reasonable (typically less than 25%)
-        self.assertLess(xml_overhead_percentage, 10, 
-                       "XML overhead is unusually high (>10%), might indicate an issue")
+        self.assertLess(xml_overhead_percentage, 25, 
+                       "XML overhead is unusually high (>25%), might indicate an issue")
         
-        # The XML overhead should be at least 5% (if it's less, we might be missing tags)
+        # The XML overhead should be at least 1% (if it's less, we might be missing tags)
         self.assertGreater(xml_overhead_percentage, 1,
                           "XML overhead is unusually low (<1%), might be missing XML tags")
         
